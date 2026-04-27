@@ -1,14 +1,13 @@
 import os
-from google import genai
-from google.genai import types
+from groq import Groq
 from cerebras.cloud.sdk import Cerebras
 
 # ── API Keys ──────────────────────────────────────────────────────────────────
-GEMINI_API_KEY   = os.environ.get("GEMINI_API_KEY", "")
+GROQ_API_KEY     = os.environ.get("GROQ_API_KEY", "")
 CEREBRAS_API_KEY = os.environ.get("CEREBRAS_API_KEY", "")
 
 # ── Model config ──────────────────────────────────────────────────────────────
-GEMINI_MODEL = "gemini-2.0-flash-lite"
+GROQ_MODEL     = "llama-3.3-70b-versatile"
 CEREBRAS_MODEL = "llama3.1-8b"
 
 # ── Model-specific rules ──────────────────────────────────────────────────────
@@ -18,30 +17,35 @@ MODEL_RULES = {
 - Be explicit about file paths, tools, and step-by-step reasoning
 - Claude Code operates in an agentic loop — write the prompt assuming multi-step execution
 - Specify verification steps after each action
+- Reference specific tools when relevant: Bash, Read, Write, Edit, WebFetch
 """,
     "gpt-4": """
 - Use clear markdown headers (##) to separate sections
 - Be direct and task-focused — GPT-4 responds well to explicit instructions
 - Include a clear output format specification
 - Chain-of-thought is optional but helpful for complex tasks
+- Numbered lists work well for multi-step instructions
 """,
     "cursor": """
 - Cursor operates inside an IDE with file context — reference files and lines explicitly
 - Keep instructions minimal and action-oriented
 - One logical change at a time
 - Always end with a verification step
+- Use .mdc rule format when defining persistent behaviors
 """,
     "gemini": """
 - Gemini handles multimodal input — specify input type clearly if not text
 - Use numbered steps for sequential tasks
 - Be explicit about output format and length
 - Gemini responds well to role + task + format structure
+- For long context tasks, put the most important instruction at the end
 """,
     "general": """
 - Use clear role + task + context + output format structure
 - Be explicit about constraints and edge cases
 - Include output format specification
 - Add examples if the task is ambiguous
+- Keep instructions positive — say what to do, not just what to avoid
 """,
 }
 
@@ -53,19 +57,39 @@ def build_system_prompt(
     exemplars:    list[dict],
 ) -> str:
 
-    model_rules = MODEL_RULES.get(target_model, MODEL_RULES["general"])
+    model_rules    = MODEL_RULES.get(target_model, MODEL_RULES["general"])
 
     depth_guidance = {
-        "concise":       "Keep the output tight and minimal. Under 180 words. Only what is essential.",
-        "standard":      "Balanced structure. Cover role, task, context, format, constraints. 250-450 words.",
-        "comprehensive": "Full structure with XML tags, examples, edge cases, and reasoning guidance. 450+ words.",
-    }.get(depth, "Balanced structure. 250-450 words.")
+        "concise": (
+            "Keep the output tight and minimal. "
+            "Under 180 words. Only what is essential. "
+            "No fluff, no redundant sections."
+        ),
+        "standard": (
+            "Balanced structure. "
+            "Cover role, task, context, format, constraints. "
+            "Target 250-450 words."
+        ),
+        "comprehensive": (
+            "Full structure with XML tags, examples, edge cases, "
+            "and reasoning guidance. "
+            "Target 450+ words. "
+            "Include at least one concrete example."
+        ),
+    }.get(depth, "Balanced structure. Target 250-450 words.")
 
     exemplar_block = ""
     if exemplars:
-        exemplar_block = "\n\nHere are high-quality reference prompts for this model and task type. Use their structure and style as inspiration — do not copy them verbatim:\n"
+        exemplar_block = (
+            "\n\nHere are high-quality reference prompts for this model "
+            "and task type. Use their structure and style as inspiration "
+            "— do not copy them verbatim:\n"
+        )
         for i, ex in enumerate(exemplars, 1):
-            exemplar_block += f"\n--- Exemplar {i} [{ex.get('target_model')} / {ex.get('task_type')}] ---\n"
+            exemplar_block += (
+                f"\n--- Exemplar {i} "
+                f"[{ex.get('target_model')} / {ex.get('task_type')}] ---\n"
+            )
             exemplar_block += ex.get("prompt", "")[:400]
             exemplar_block += "\n"
 
@@ -88,34 +112,37 @@ General prompt engineering principles:
 6. Preserve any {{placeholders}} the user wrote
 7. Encourage step-by-step reasoning for complex tasks
 8. Preserve the user's original intent — improve structure, do not change the goal
+9. Address the executing model in second person
+10. Never add meta-commentary or explain what you changed
 {exemplar_block}
 
 ABSOLUTE OUTPUT RULES:
 - Output ONLY the transformed prompt
-- NO preamble like "Here is..." or "I've transformed..."
+- NO preamble like "Here is..." or "I have transformed..."
 - NO explanation of what you changed
 - NO markdown code fences
-- NO commentary anywhere
+- NO commentary anywhere before or after
 - First character of your response = first character of the prompt
-- Ready to copy-paste immediately"""
+- Last character of your response = last character of the prompt
+- Ready to copy-paste immediately, nothing else needed"""
 
 
-# ── Gemini call ───────────────────────────────────────────────────────────────
-def call_gemini(system_prompt: str, user_prompt: str) -> str:
-    if not GEMINI_API_KEY:
-        raise ValueError("GEMINI_API_KEY not set.")
+# ── Groq call ─────────────────────────────────────────────────────────────────
+def call_groq(system_prompt: str, user_prompt: str) -> str:
+    if not GROQ_API_KEY:
+        raise ValueError("GROQ_API_KEY not set.")
 
-    client   = genai.Client(api_key=GEMINI_API_KEY)
-    response = client.models.generate_content(
-        model  = GEMINI_MODEL,
-        config = types.GenerateContentConfig(
-            system_instruction = system_prompt,
-            max_output_tokens  = 1500,
-            temperature        = 0.7,
-        ),
-        contents = user_prompt,
+    client   = Groq(api_key=GROQ_API_KEY)
+    response = client.chat.completions.create(
+        model    = GROQ_MODEL,
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user",   "content": user_prompt},
+        ],
+        max_tokens  = 1500,
+        temperature = 0.7,
     )
-    return response.text.strip()
+    return response.choices[0].message.content.strip()
 
 
 # ── Cerebras fallback ─────────────────────────────────────────────────────────
@@ -146,7 +173,7 @@ def transform_prompt(
     """
     Transform a raw prompt into a structured one.
     Returns (transformed_prompt, provider_used).
-    Tries Gemini first, falls back to Cerebras on failure.
+    Tries Groq first, falls back to Cerebras on failure.
     """
     system_prompt = build_system_prompt(
         target_model = target_model,
@@ -156,12 +183,12 @@ def transform_prompt(
     )
     user_message = f"Raw prompt to transform:\n\n{raw_prompt}"
 
-    # Try Gemini first
+    # Try Groq first
     try:
-        result = call_gemini(system_prompt, user_message)
-        return result, "Gemini 2.0 Flash"
+        result = call_groq(system_prompt, user_message)
+        return result, "Groq (llama-3.3-70b)"
     except Exception as e:
-        print(f"Gemini failed: {e} — falling back to Cerebras...")
+        print(f"Groq failed: {e} — falling back to Cerebras...")
 
     # Fallback to Cerebras
     try:
@@ -169,7 +196,7 @@ def transform_prompt(
         return result, "Cerebras (llama3.1-8b)"
     except Exception as e:
         raise RuntimeError(
-            f"Both Gemini and Cerebras failed.\n"
+            f"Both Groq and Cerebras failed.\n"
             f"Last error: {e}\n"
             f"Check your API keys in HF Space Secrets."
         )
