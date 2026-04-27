@@ -78,11 +78,24 @@ def forge(raw_prompt: str, target_model: str, depth: str):
     else:
         exemplar_text = "No exemplars retrieved."
 
+    usage = result.get("usage", {})
+    token_info = ""
+    if usage:
+        total_tokens = usage.get("total_tokens")
+        cost = usage.get("cost")
+        approximate = usage.get("approximate", False)
+        token_info = (
+            f" | Tokens: {total_tokens} "
+            f"| Cost: ${cost:.6f} "
+            f"({'approx' if approximate else 'exact'})"
+        )
+
     stats = (
         f"✅ Provider: {result['provider']}  |  "
         f"Task: {result['task_type']}  |  "
         f"Exemplars: {len(result['exemplars'])}  |  "
         f"Score: {score_result['overall']}/10 — {score_result['grade']}"
+        f"{token_info}"
     )
 
     return (

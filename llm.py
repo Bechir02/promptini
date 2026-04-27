@@ -1,14 +1,24 @@
 import os
+import re
 from groq import Groq
 from cerebras.cloud.sdk import Cerebras
+
+try:
+    import tiktoken
+except ImportError:
+    tiktoken = None
 
 # ── API Keys ──────────────────────────────────────────────────────────────────
 GROQ_API_KEY     = os.environ.get("GROQ_API_KEY", "")
 CEREBRAS_API_KEY = os.environ.get("CEREBRAS_API_KEY", "")
 
-# ── Model config ──────────────────────────────────────────────────────────────
+# ── Model config ───────────────────────────────────────────────────────────────
 GROQ_MODEL     = "llama-3.3-70b-versatile"
 CEREBRAS_MODEL = "llama3.1-8b"
+
+# ── Cost assumptions ───────────────────────────────────────────────────────────
+GROQ_COST_PER_1K = float(os.environ.get("GROQ_COST_PER_1K", "0.02"))
+CEREBRAS_COST_PER_1K = float(os.environ.get("CEREBRAS_COST_PER_1K", "0.02"))
 
 # ── Output format per model ───────────────────────────────────────────────────
 OUTPUT_FORMATS = {
@@ -279,8 +289,83 @@ EXAMPLE of correct format for {target_model}:
 - NO commentary after the prompt ends"""
 
 
+def get_encoding():
+    if tiktoken is None:
+        return None
+
+    for name in ["cl100k_base", "gpt2"]:
+        try:
+            return tiktoken.get_encoding(name)
+        except Exception:
+            continue
+    return None
+
+
+def count_tokens(text: str) -> int:
+    if not text:
+        return 0
+
+    encoding = get_encoding()
+    if encoding is not None:
+        try:
+            return len(encoding.encode(text))
+        except Exception:
+            pass
+
+    # fallback estimate
+    return len(re.findall(r"\S+", text))
+
+
+def extract_usage_from_response(response):
+    usage = None
+
+    if response is None:
+        return None
+
+    if hasattr(response, "usage"):
+        usage = getattr(response, "usage")
+    elif isinstance(response, dict):
+        usage = response.get("usage")
+
+    if usage is None:
+        return None
+
+    result = {}
+    for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
+        if isinstance(usage, dict):
+            result[key] = usage.get(key)
+        else:
+            result[key] = getattr(usage, key, None)
+    return result
+
+
+def compute_usage(system_prompt: str, user_prompt: str, output_text: str, response, provider: str) -> dict:
+    provider_price = GROQ_COST_PER_1K if "Groq" in provider else CEREBRAS_COST_PER_1K
+    usage = extract_usage_from_response(response) or {}
+
+    prompt_tokens = usage.get("prompt_tokens")
+    completion_tokens = usage.get("completion_tokens")
+    total_tokens = usage.get("total_tokens")
+
+    if prompt_tokens is None or completion_tokens is None or total_tokens is None:
+        prompt_tokens = count_tokens(system_prompt) + count_tokens(user_prompt)
+        completion_tokens = count_tokens(output_text)
+        total_tokens = prompt_tokens + completion_tokens
+        usage["approximate"] = True
+    else:
+        usage["approximate"] = False
+
+    usage["prompt_tokens"] = prompt_tokens
+    usage["completion_tokens"] = completion_tokens
+    usage["total_tokens"] = total_tokens
+    usage["price_per_1k"] = provider_price
+    usage["cost"] = round((total_tokens / 1000.0) * provider_price, 6)
+
+    return usage
+
+
 # ── Groq call ─────────────────────────────────────────────────────────────────
-def call_groq(system_prompt: str, user_prompt: str) -> str:
+def call_groq(system_prompt: str, user_prompt: str):
     if not GROQ_API_KEY:
         raise ValueError("GROQ_API_KEY not set.")
 
@@ -294,11 +379,11 @@ def call_groq(system_prompt: str, user_prompt: str) -> str:
         max_tokens  = 1000,
         temperature = 0.4,
     )
-    return response.choices[0].message.content.strip()
+    return response.choices[0].message.content.strip(), response
 
 
 # ── Cerebras fallback ─────────────────────────────────────────────────────────
-def call_cerebras(system_prompt: str, user_prompt: str) -> str:
+def call_cerebras(system_prompt: str, user_prompt: str):
     if not CEREBRAS_API_KEY:
         raise ValueError("CEREBRAS_API_KEY not set.")
 
@@ -311,7 +396,7 @@ def call_cerebras(system_prompt: str, user_prompt: str) -> str:
         ],
         max_tokens = 1000,
     )
-    return response.choices[0].message.content.strip()
+    return response.choices[0].message.content.strip(), response
 
 
 def validate_transformed_prompt(result: str, target_model: str) -> None:
@@ -342,7 +427,7 @@ def transform_prompt(
     task_type:    str,
     depth:        str,
     exemplars:    list[dict],
-) -> tuple[str, str]:
+) -> tuple[str, str, dict]:
     """
     Transform a raw prompt into a structured one.
     Returns (transformed_prompt, provider_used).
@@ -357,16 +442,18 @@ def transform_prompt(
     user_message = f"Raw prompt to transform:\n\n{raw_prompt}"
 
     try:
-        result = call_groq(system_prompt, user_message)
+        result, response = call_groq(system_prompt, user_message)
         validate_transformed_prompt(result, target_model)
-        return result, "Groq (llama-3.3-70b)"
+        usage = compute_usage(system_prompt, user_message, result, response, "Groq")
+        return result, "Groq (llama-3.3-70b)", usage
     except Exception as e:
         print(f"Groq failed: {e} — falling back to Cerebras...")
 
     try:
-        result = call_cerebras(system_prompt, user_message)
+        result, response = call_cerebras(system_prompt, user_message)
         validate_transformed_prompt(result, target_model)
-        return result, "Cerebras (llama3.1-8b)"
+        usage = compute_usage(system_prompt, user_message, result, response, "Cerebras")
+        return result, "Cerebras (llama3.1-8b)", usage
     except Exception as e:
         raise RuntimeError(
             f"Both Groq and Cerebras failed.\n"

@@ -135,7 +135,7 @@ def run_pipeline(
 
     # Step 3 — transform
     try:
-        transformed, provider = transform_prompt(
+        transformed, provider, usage = transform_prompt(
             raw_prompt   = raw_prompt,
             target_model = target_model,
             task_type    = task_type,
@@ -149,6 +149,7 @@ def run_pipeline(
             "provider":    provider,
             "task_type":   task_type,
             "exemplars":   exemplars,
+            "usage":       usage,
             "error":       None,
         }
 
