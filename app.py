@@ -9,6 +9,114 @@ from scorer import score_transformation, format_score_for_ui
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
+CSS = """
+body {
+    background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 55%, #f8fafc 100%);
+    min-height: 100vh;
+    color: #0f172a;
+}
+.gradio-container {
+    max-width: 1140px;
+    margin: 0 auto;
+    padding: 22px 20px 32px;
+}
+#app_header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 20px;
+}
+.app-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #ff7a59;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+.app-title {
+    font-size: 2.4rem;
+    font-weight: 800;
+    margin: 0.1rem 0 0.4rem;
+    line-height: 1.05;
+}
+.app-subtitle {
+    color: #475569;
+    font-size: 1rem;
+    max-width: 660px;
+    line-height: 1.7;
+}
+.app-box {
+    border-radius: 24px;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+    padding: 24px;
+}
+.app-footer {
+    color: #64748b;
+    font-size: 0.95rem;
+    text-align: center;
+    margin-top: 24px;
+}
+.gradio-row, .gradio-column {
+    gap: 24px !important;
+}
+.gradio-box, .app-box {
+    min-width: 0;
+}
+.gr-textbox, .gr-dropdown, .gr-button, .gr-markdown {
+    border-radius: 16px;
+}
+.gr-button.primary {
+    background: #ff7a59 !important;
+    color: white !important;
+    border: none !important;
+    min-height: 54px;
+    font-weight: 700;
+}
+.gr-button.primary:hover {
+    background: #f15f3e !important;
+}
+#status_display textarea, #status_display .gr-textbox {
+    min-height: 80px;
+    background: #f8fafc;
+    border-color: #e2e8f0;
+}
+#output_display textarea, #copy_output textarea, #exemplar_display textarea, #score_display textarea {
+    border-color: #e2e8f0;
+}
+.gr-block .gr-markdown h1, .gr-block .gr-markdown h2 {
+    color: #0f172a;
+}
+@media (max-width: 920px) {
+    .gradio-row {
+        flex-direction: column !important;
+    }
+    #app_header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+@media (max-width: 640px) {
+    .gradio-container {
+        padding: 16px 14px 24px;
+    }
+    .app-box {
+        padding: 18px;
+    }
+    .gr-button.primary {
+        min-height: 48px;
+    }
+    .app-title {
+        font-size: 1.75rem;
+    }
+}
+"""
+
 # ── Build index on startup if missing ─────────────────────────────────────────
 print("Checking index...")
 if not Path("lancedb_store").exists():
@@ -108,81 +216,101 @@ def forge(raw_prompt: str, target_model: str, depth: str):
 
 
 # ── Gradio UI ─────────────────────────────────────────────────────────────────
-with gr.Blocks(title="Prompt Forge RAG") as demo:
+with gr.Blocks(title="Prompt Forge RAG", css=CSS) as demo:
 
-    gr.Markdown("# 🔥 Prompt Forge RAG")
-    gr.Markdown(
-        "Paste any messy prompt — get a structured, "
-        "model-optimized, copy-ready prompt back."
-    )
+    with gr.Row(elem_id="app_header"):
+        with gr.Column(scale=1, min_width=0):
+            gr.Markdown(
+                """
+                <div class=\"app-label\">Prompt Forge RAG</div>
+                <div class=\"app-title\">Clean prompts. Faster results. Better models.</div>
+                <div class=\"app-subtitle\">Paste any messy prompt and get a polished, model-optimized instruction set ready for production.</div>
+                """
+            )
+        with gr.Column(scale=0, min_width=260):
+            gr.Markdown(
+                """
+                - ✅ Lightweight modern UI
+                - ✅ Token & cost visibility
+                - ✅ Mobile-friendly layout
+                """
+            )
 
     with gr.Row():
 
         # ── Left column — inputs ──────────────────────────────────────────────
         with gr.Column(scale=1):
-            gr.Markdown("### Input")
-
-            raw_input = gr.Textbox(
-                label       = "Your raw prompt",
-                placeholder = "e.g. write me a python script that reads csv and finds duplicates...",
-                lines       = 12,
-            )
-
-            with gr.Row():
-                model_dropdown = gr.Dropdown(
-                    choices = MODELS,
-                    value   = "general",
-                    label   = "Target model",
-                )
-                depth_dropdown = gr.Dropdown(
-                    choices = DEPTHS,
-                    value   = "standard",
-                    label   = "Depth",
+            with gr.Box():
+                gr.Markdown("### Input")
+                raw_input = gr.Textbox(
+                    label       = "Your raw prompt",
+                    placeholder = "e.g. write me a python script that reads csv and finds duplicates...",
+                    lines       = 12,
                 )
 
-            forge_btn = gr.Button(
-                "⚡ Forge it",
-                variant = "primary",
-                size    = "lg",
-            )
+                with gr.Row():
+                    model_dropdown = gr.Dropdown(
+                        choices = MODELS,
+                        value   = "general",
+                        label   = "Target model",
+                    )
+                    depth_dropdown = gr.Dropdown(
+                        choices = DEPTHS,
+                        value   = "standard",
+                        label   = "Depth",
+                    )
 
-            gr.Markdown("### Retrieved exemplars")
-            exemplar_display = gr.Textbox(
-                label       = "Exemplars used as context",
-                lines       = 5,
-                interactive = False,
-            )
+                forge_btn = gr.Button(
+                    "⚡ Forge it",
+                    variant = "primary",
+                    size    = "lg",
+                )
 
-            gr.Markdown("### Quality score")
-            score_display = gr.Textbox(
-                label       = "Transformation score breakdown",
-                lines       = 8,
-                interactive = False,
-                info        = "Automated quality assessment across 5 dimensions."
-            )
+            with gr.Box():
+                gr.Markdown("### Retrieved exemplars")
+                exemplar_display = gr.Textbox(
+                    label       = "Exemplars used as context",
+                    lines       = 5,
+                    interactive = False,
+                )
+
+            with gr.Box():
+                gr.Markdown("### Quality score")
+                score_display = gr.Textbox(
+                    label       = "Transformation score breakdown",
+                    lines       = 8,
+                    interactive = False,
+                    info        = "Automated quality assessment across 5 dimensions."
+                )
 
         # ── Right column — outputs ────────────────────────────────────────────
         with gr.Column(scale=1):
-            gr.Markdown("### Output")
+            with gr.Box():
+                gr.Markdown("### Output")
 
-            status_display = gr.Textbox(
-                label       = "Status",
-                lines       = 2,
-                interactive = False,
-            )
+                status_display = gr.Textbox(
+                    label       = "Status",
+                    lines       = 2,
+                    interactive = False,
+                    elem_id     = "status_display",
+                )
 
-            output_display = gr.Textbox(
-                label       = "Transformed prompt",
-                lines       = 20,
-                interactive = False,
-            )
+                output_display = gr.Textbox(
+                    label       = "Transformed prompt",
+                    lines       = 20,
+                    interactive = False,
+                    elem_id     = "output_display",
+                )
 
-            copy_output = gr.Textbox(
-                label       = "Copy-paste ready",
-                lines       = 4,
-                interactive = True,
-                info        = "Editable — make final tweaks here before copying."
-            )
+            with gr.Box():
+                gr.Markdown("### Copy-paste ready")
+                copy_output = gr.Textbox(
+                    label       = "Editable prompt",
+                    lines       = 6,
+                    interactive = True,
+                    info        = "Make final tweaks here before copying.",
+                    elem_id     = "copy_output",
+                )
 
     # ── Examples ─────────────────────────────────────────────────────────────
     gr.Markdown("### Try these examples")
@@ -236,10 +364,10 @@ with gr.Blocks(title="Prompt Forge RAG") as demo:
     )
 
     # ── Footer ────────────────────────────────────────────────────────────────
-    gr.Markdown(
-        "Built with Gradio · BGE-small embeddings · "
-        "LanceDB · Groq llama-3.3-70b · Cerebras fallback"
-    )
+    with gr.Row():
+        gr.Markdown(
+            '<div class="app-footer">Built with Gradio · BGE-small embeddings · LanceDB · Groq llama-3.3-70b · Cerebras fallback</div>'
+        )
 
 if __name__ == "__main__":
     demo.launch()
