@@ -77,30 +77,11 @@ def forge(raw_prompt: str, target_model: str, depth: str):
 
 
 # ── Gradio UI ─────────────────────────────────────────────────────────────────
-with gr.Blocks(
-    title="Prompt Forge RAG",
-    theme=gr.themes.Base(
-        primary_hue="orange",
-        neutral_hue="stone",
-        font=gr.themes.GoogleFont("JetBrains Mono"),
-    ),
-    css="""
-        .container { max-width: 1200px; margin: auto; }
-        .title { text-align: center; margin-bottom: 8px; }
-        .subtitle { text-align: center; color: #888; margin-bottom: 24px; }
-        .output-box textarea { font-family: 'JetBrains Mono', monospace !important; }
-        .input-box textarea  { font-family: 'JetBrains Mono', monospace !important; }
-        footer { display: none !important; }
-    """
-) as demo:
+with gr.Blocks(title="Prompt Forge RAG") as demo:
 
+    gr.Markdown("# 🔥 Prompt Forge RAG")
     gr.Markdown(
-        "# 🔥 Prompt Forge RAG",
-        elem_classes="title"
-    )
-    gr.Markdown(
-        "Paste any messy prompt — get a structured, model-optimized, copy-ready prompt back.",
-        elem_classes="subtitle"
+        "Paste any messy prompt — get a structured, model-optimized, copy-ready prompt back."
     )
 
     with gr.Row():
@@ -113,7 +94,6 @@ with gr.Blocks(
                 label       = "Your raw prompt",
                 placeholder = "e.g. write me a python script that reads csv and finds duplicates...",
                 lines       = 12,
-                elem_classes= "input-box",
             )
 
             with gr.Row():
@@ -136,8 +116,8 @@ with gr.Blocks(
 
             gr.Markdown("### Retrieved exemplars")
             exemplar_display = gr.Textbox(
-                label    = "Exemplars used as context",
-                lines    = 6,
+                label       = "Exemplars used as context",
+                lines       = 6,
                 interactive = False,
             )
 
@@ -155,15 +135,13 @@ with gr.Blocks(
                 label       = "Transformed prompt",
                 lines       = 18,
                 interactive = False,
-                elem_classes= "output-box",
-                show_copy_button = True,
             )
 
             copy_output = gr.Textbox(
-                label    = "Copy-paste ready (same content)",
-                lines    = 3,
+                label       = "Copy-paste ready (same content)",
+                lines       = 3,
                 interactive = True,
-                info     = "This box is editable — make final tweaks here before copying."
+                info        = "This box is editable — make final tweaks here before copying."
             )
 
     # ── Examples ─────────────────────────────────────────────────────────────
@@ -208,8 +186,7 @@ with gr.Blocks(
 
     # ── Footer ────────────────────────────────────────────────────────────────
     gr.Markdown(
-        "Built with Gradio · BGE-small embeddings · LanceDB · Gemini 2.0 Flash + Cerebras fallback",
-        elem_classes="subtitle"
+        "Built with Gradio · BGE-small embeddings · LanceDB · Gemini 2.0 Flash + Cerebras fallback"
     )
 
 if __name__ == "__main__":
