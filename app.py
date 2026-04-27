@@ -2,6 +2,7 @@ import gradio as gr
 from rag import run_pipeline
 from ingest import build_index
 from pathlib import Path
+from scorer import score_transformation, format_score_for_ui
 
 # ── Build index on startup if missing ─────────────────────────────────────────
 print("Checking index...")
@@ -29,12 +30,7 @@ DEPTHS = [
 # ── Core function called by Gradio ────────────────────────────────────────────
 def forge(raw_prompt: str, target_model: str, depth: str):
     if not raw_prompt.strip():
-        return (
-            "",
-            "⚠️ Please paste a prompt first.",
-            "",
-            "",
-        )
+        return "", "⚠️ Please paste a prompt first.", "", "", ""
 
     result = run_pipeline(
         raw_prompt   = raw_prompt,
@@ -43,14 +39,18 @@ def forge(raw_prompt: str, target_model: str, depth: str):
     )
 
     if result["error"]:
-        return (
-            "",
-            f"❌ Error: {result['error']}",
-            "",
-            "",
-        )
+        return "", f"❌ Error: {result['error']}", "", "", ""
 
-    # Format exemplars for display
+    # Score the transformation
+    score_result = score_transformation(
+        raw_prompt   = raw_prompt,
+        output       = result["transformed"],
+        target_model = target_model,
+        task_type    = result["task_type"],
+    )
+    score_text = format_score_for_ui(score_result)
+
+    # Format exemplars
     exemplar_text = ""
     if result["exemplars"]:
         for i, ex in enumerate(result["exemplars"], 1):
@@ -64,8 +64,9 @@ def forge(raw_prompt: str, target_model: str, depth: str):
 
     stats = (
         f"✅ Provider: {result['provider']}  |  "
-        f"Task detected: {result['task_type']}  |  "
-        f"Exemplars used: {len(result['exemplars'])}"
+        f"Task: {result['task_type']}  |  "
+        f"Exemplars: {len(result['exemplars'])}  |  "
+        f"Score: {score_result['overall']}/10 — {score_result['grade']}"
     )
 
     return (
@@ -73,6 +74,7 @@ def forge(raw_prompt: str, target_model: str, depth: str):
         stats,
         exemplar_text,
         result["transformed"],
+        score_text,
     )
 
 
@@ -81,7 +83,8 @@ with gr.Blocks(title="Prompt Forge RAG") as demo:
 
     gr.Markdown("# 🔥 Prompt Forge RAG")
     gr.Markdown(
-        "Paste any messy prompt — get a structured, model-optimized, copy-ready prompt back."
+        "Paste any messy prompt — get a structured, "
+        "model-optimized, copy-ready prompt back."
     )
 
     with gr.Row():
@@ -117,8 +120,16 @@ with gr.Blocks(title="Prompt Forge RAG") as demo:
             gr.Markdown("### Retrieved exemplars")
             exemplar_display = gr.Textbox(
                 label       = "Exemplars used as context",
-                lines       = 6,
+                lines       = 5,
                 interactive = False,
+            )
+
+            gr.Markdown("### Quality score")
+            score_display = gr.Textbox(
+                label       = "Transformation score breakdown",
+                lines       = 8,
+                interactive = False,
+                info        = "Automated quality assessment across 5 dimensions."
             )
 
         # ── Right column — outputs ────────────────────────────────────────────
@@ -127,21 +138,21 @@ with gr.Blocks(title="Prompt Forge RAG") as demo:
 
             status_display = gr.Textbox(
                 label       = "Status",
-                lines       = 1,
+                lines       = 2,
                 interactive = False,
             )
 
             output_display = gr.Textbox(
                 label       = "Transformed prompt",
-                lines       = 18,
+                lines       = 20,
                 interactive = False,
             )
 
             copy_output = gr.Textbox(
-                label       = "Copy-paste ready (same content)",
-                lines       = 3,
+                label       = "Copy-paste ready",
+                lines       = 4,
                 interactive = True,
-                info        = "This box is editable — make final tweaks here before copying."
+                info        = "Editable — make final tweaks here before copying."
             )
 
     # ── Examples ─────────────────────────────────────────────────────────────
@@ -173,6 +184,11 @@ with gr.Blocks(title="Prompt Forge RAG") as demo:
                 "general",
                 "comprehensive",
             ],
+            [
+                "i want to build a n8n workflow that reads leads from google sheets and sends personalized emails",
+                "claude-code",
+                "comprehensive",
+            ],
         ],
         inputs=[raw_input, model_dropdown, depth_dropdown],
     )
@@ -181,12 +197,19 @@ with gr.Blocks(title="Prompt Forge RAG") as demo:
     forge_btn.click(
         fn      = forge,
         inputs  = [raw_input, model_dropdown, depth_dropdown],
-        outputs = [output_display, status_display, exemplar_display, copy_output],
+        outputs = [
+            output_display,
+            status_display,
+            exemplar_display,
+            copy_output,
+            score_display,
+        ],
     )
 
     # ── Footer ────────────────────────────────────────────────────────────────
     gr.Markdown(
-        "Built with Gradio · BGE-small embeddings · LanceDB · Gemini 2.0 Flash + Cerebras fallback"
+        "Built with Gradio · BGE-small embeddings · "
+        "LanceDB · Groq llama-3.3-70b · Cerebras fallback"
     )
 
 if __name__ == "__main__":
