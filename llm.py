@@ -11,7 +11,6 @@ GROQ_MODEL     = "llama-3.3-70b-versatile"
 CEREBRAS_MODEL = "llama3.1-8b"
 
 # ── Output format per model ───────────────────────────────────────────────────
-# This is the most important config — controls structure of transformed prompt
 OUTPUT_FORMATS = {
     "claude-code": {
         "format":      "xml",
@@ -61,7 +60,7 @@ Build a CSV duplicate finder that returns duplicate rows with their counts.
 
     "cursor": {
         "format":      "minimal",
-        "description": "Minimal, action-first. No headers, no XML. Short paragraphs. One clear task per sentence. End with verification step.",
+        "description": "Minimal, action-first. No headers, no XML. Short paragraphs. One clear task per sentence. You are working inside Cursor IDE. End with a concrete verification step.",
         "example": """You are working inside Cursor IDE on a Python project.
 
 Find all duplicate rows in {csv_path} using pandas. Return a DataFrame with columns duplicate_row and count. Handle missing files with a clear error message.
@@ -115,11 +114,14 @@ TASK_GUIDANCE = {
 - Add at least one concrete usage example
 """,
     "debugging": """
-- Include the exact error message as a field
-- Specify expected vs actual behavior clearly
-- Ask for root cause explanation BEFORE the fix
-- Request a prevention strategy for this class of bug
-- Keep the scope narrow — fix this bug, don't refactor everything
+- ALWAYS include these four elements — no exceptions:
+  1. The exact error message or exception type
+  2. Root cause analysis BEFORE any fix is proposed
+  3. The concrete fix with corrected code
+  4. Prevention strategy for this class of bug
+- Keep scope narrow — fix this specific bug only, do not refactor
+- End with a concrete verification step — not "ensure it works" but exactly how to test
+- Use the words: error, root cause, fix, prevent
 """,
     "code_review": """
 - Define the review criteria explicitly (security, performance, style, correctness)
@@ -205,14 +207,14 @@ def build_system_prompt(
     exemplars:    list[dict],
 ) -> str:
 
-    fmt          = OUTPUT_FORMATS.get(target_model, OUTPUT_FORMATS["general"])
-    task_guide   = TASK_GUIDANCE.get(task_type, TASK_GUIDANCE["general"])
+    fmt        = OUTPUT_FORMATS.get(target_model, OUTPUT_FORMATS["general"])
+    task_guide = TASK_GUIDANCE.get(task_type, TASK_GUIDANCE["general"])
 
     depth_guidance = {
         "concise": (
             "CONCISE MODE: Output under 180 words. "
             "Include only role + task + the single most important constraint. "
-            "Cut everything else."
+            "Cut everything else. No examples."
         ),
         "standard": (
             "STANDARD MODE: 250-450 words. "
@@ -229,7 +231,11 @@ def build_system_prompt(
 
     exemplar_block = ""
     if exemplars:
-        exemplar_block = "\n\nSTUDY these high-quality exemplars for this exact model and task. Learn their structure, specificity, and tone — do NOT copy them:\n"
+        exemplar_block = (
+            "\n\nSTUDY these high-quality exemplars for this exact model "
+            "and task. Learn their structure, specificity, and tone "
+            "— do NOT copy them verbatim:\n"
+        )
         for i, ex in enumerate(exemplars, 1):
             exemplar_block += (
                 f"\n--- Exemplar {i} "
@@ -260,7 +266,7 @@ EXAMPLE of correct format for {target_model}:
 2. Be specific to THIS task — no generic boilerplate
 3. Preserve all {{placeholders}} from the original prompt
 4. Preserve the user's intent exactly — restructure, never redirect
-5. Use the correct format for {target_model} — see above
+5. Use the correct format for {target_model} — see example above
 6. Make constraints concrete and testable, not vague
 7. The transformed prompt must be dramatically more useful than the input
 {ANTI_GENERIC}
@@ -268,7 +274,7 @@ EXAMPLE of correct format for {target_model}:
 
 ━━━ ABSOLUTE OUTPUT RULES ━━━
 - Output ONLY the transformed prompt — nothing else
-- NO "Here is your prompt:" or any preamble
+- NO "Here is your prompt:" or any preamble whatsoever
 - NO explanation of what you changed
 - NO markdown code fences around the output
 - NO commentary after the prompt ends
