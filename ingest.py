@@ -33,30 +33,29 @@ def embed(text: str) -> list[float]:
 def build_index(force: bool = False):
     db_dir = Path(DB_PATH)
 
-    # Skip rebuild if index already exists and force=False
     if db_dir.exists() and not force:
         print(f"Index already exists at '{DB_PATH}'. Skipping rebuild.")
-        print("Pass force=True to rebuild from scratch.")
         return
 
     print(f"Building index from '{PROMPTS_FILE}'...")
 
-    # Load prompts
     with open(PROMPTS_FILE, "r", encoding="utf-8") as f:
         prompts = json.load(f)
 
     print(f"Loaded {len(prompts)} prompts.")
 
-    # Build rows for LanceDB
     rows = []
     for i, p in enumerate(prompts):
-        # Text we embed = task_type + target_model + first 300 chars of prompt
-        embed_text = (
-            f"{p.get('task_type', '')} "
-            f"{p.get('target_model', '')} "
-            f"{p.get('prompt', '')[:300]}"
-        )
-        vector = embed(embed_text)
+        # Use cached embedding if available, else compute
+        if "embedding" in p:
+            vector = p["embedding"]
+        else:
+            embed_text = (
+                f"{p.get('task_type', '')} "
+                f"{p.get('target_model', '')} "
+                f"{p.get('prompt', '')[:300]}"
+            )
+            vector = embed(embed_text)
 
         rows.append({
             "id":           p.get("id", f"prompt_{i}"),
@@ -69,15 +68,9 @@ def build_index(force: bool = False):
             "vector":       vector,
         })
 
-        print(f"  Embedded [{i+1}/{len(prompts)}] {p.get('id', '?')}")
-
-    # Write to LanceDB
-    db    = lancedb.connect(DB_PATH)
-
-    # Drop existing table if rebuilding
+    db = lancedb.connect(DB_PATH)
     if TABLE_NAME in db.table_names():
         db.drop_table(TABLE_NAME)
-        print(f"Dropped existing table '{TABLE_NAME}'.")
 
     table = db.create_table(TABLE_NAME, data=rows)
     print(f"Created table '{TABLE_NAME}' with {len(rows)} rows.")
