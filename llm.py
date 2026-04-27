@@ -1,5 +1,6 @@
 import os
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from cerebras.cloud.sdk import Cerebras
 
 # ── API Keys ──────────────────────────────────────────────────────────────────
@@ -10,7 +11,7 @@ CEREBRAS_API_KEY = os.environ.get("CEREBRAS_API_KEY", "")
 GEMINI_MODEL   = "gemini-2.0-flash"
 CEREBRAS_MODEL = "llama3.1-8b"
 
-# ── Model-specific rules injected into the transformation ─────────────────────
+# ── Model-specific rules ──────────────────────────────────────────────────────
 MODEL_RULES = {
     "claude-code": """
 - Use XML tags to separate sections: <role>, <task>, <context>, <constraints>, <output_format>
@@ -44,7 +45,7 @@ MODEL_RULES = {
 """,
 }
 
-# ── Build the system prompt ───────────────────────────────────────────────────
+# ── Build system prompt ───────────────────────────────────────────────────────
 def build_system_prompt(
     target_model: str,
     task_type:    str,
@@ -55,12 +56,11 @@ def build_system_prompt(
     model_rules = MODEL_RULES.get(target_model, MODEL_RULES["general"])
 
     depth_guidance = {
-        "concise": "Keep the output tight and minimal. Under 180 words. Only what is essential.",
-        "standard": "Balanced structure. Cover role, task, context, format, constraints. 250-450 words.",
+        "concise":       "Keep the output tight and minimal. Under 180 words. Only what is essential.",
+        "standard":      "Balanced structure. Cover role, task, context, format, constraints. 250-450 words.",
         "comprehensive": "Full structure with XML tags, examples, edge cases, and reasoning guidance. 450+ words.",
     }.get(depth, "Balanced structure. 250-450 words.")
 
-    # Format retrieved exemplars as reference
     exemplar_block = ""
     if exemplars:
         exemplar_block = "\n\nHere are high-quality reference prompts for this model and task type. Use their structure and style as inspiration — do not copy them verbatim:\n"
@@ -105,28 +105,32 @@ def call_gemini(system_prompt: str, user_prompt: str) -> str:
     if not GEMINI_API_KEY:
         raise ValueError("GEMINI_API_KEY not set.")
 
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel(
-        model_name=GEMINI_MODEL,
-        system_instruction=system_prompt,
+    client   = genai.Client(api_key=GEMINI_API_KEY)
+    response = client.models.generate_content(
+        model  = GEMINI_MODEL,
+        config = types.GenerateContentConfig(
+            system_instruction = system_prompt,
+            max_output_tokens  = 1500,
+            temperature        = 0.7,
+        ),
+        contents = user_prompt,
     )
-    response = model.generate_content(user_prompt)
     return response.text.strip()
 
 
-# ── Cerebras fallback call ────────────────────────────────────────────────────
+# ── Cerebras fallback ─────────────────────────────────────────────────────────
 def call_cerebras(system_prompt: str, user_prompt: str) -> str:
     if not CEREBRAS_API_KEY:
         raise ValueError("CEREBRAS_API_KEY not set.")
 
-    client = Cerebras(api_key=CEREBRAS_API_KEY)
+    client   = Cerebras(api_key=CEREBRAS_API_KEY)
     response = client.chat.completions.create(
-        model=CEREBRAS_MODEL,
-        messages=[
+        model    = CEREBRAS_MODEL,
+        messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": user_prompt},
         ],
-        max_tokens=1500,
+        max_tokens = 1500,
     )
     return response.choices[0].message.content.strip()
 
@@ -145,10 +149,10 @@ def transform_prompt(
     Tries Gemini first, falls back to Cerebras on failure.
     """
     system_prompt = build_system_prompt(
-        target_model=target_model,
-        task_type=task_type,
-        depth=depth,
-        exemplars=exemplars,
+        target_model = target_model,
+        task_type    = task_type,
+        depth        = depth,
+        exemplars    = exemplars,
     )
     user_message = f"Raw prompt to transform:\n\n{raw_prompt}"
 
