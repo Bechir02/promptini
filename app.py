@@ -1,5 +1,3 @@
-import logging
-
 import gradio as gr
 from rag import run_pipeline
 from ingest import build_index
@@ -7,116 +5,6 @@ from pathlib import Path
 from scorer import score_transformation, format_score_for_ui
 from dotenv import load_dotenv
 load_dotenv()
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-logger = logging.getLogger(__name__)
-
-CSS = """
-body {
-    background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 55%, #f8fafc 100%);
-    min-height: 100vh;
-    color: #0f172a;
-}
-.gradio-container {
-    max-width: 1140px;
-    margin: 0 auto;
-    padding: 22px 20px 32px;
-}
-#app_header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 18px;
-    margin-bottom: 20px;
-}
-.app-label {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    color: #ff7a59;
-    text-transform: uppercase;
-    letter-spacing: 0.16em;
-    font-size: 0.82rem;
-    font-weight: 700;
-}
-.app-title {
-    font-size: 2.4rem;
-    font-weight: 800;
-    margin: 0.1rem 0 0.4rem;
-    line-height: 1.05;
-}
-.app-subtitle {
-    color: #475569;
-    font-size: 1rem;
-    max-width: 660px;
-    line-height: 1.7;
-}
-.app-box {
-    border-radius: 24px;
-    border: 1px solid #e2e8f0;
-    background: #ffffff;
-    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
-    padding: 24px;
-}
-.app-footer {
-    color: #64748b;
-    font-size: 0.95rem;
-    text-align: center;
-    margin-top: 24px;
-}
-.gradio-row, .gradio-column {
-    gap: 24px !important;
-}
-.gradio-box, .app-box {
-    min-width: 0;
-}
-.gr-textbox, .gr-dropdown, .gr-button, .gr-markdown {
-    border-radius: 16px;
-}
-.gr-button.primary {
-    background: #ff7a59 !important;
-    color: white !important;
-    border: none !important;
-    min-height: 54px;
-    font-weight: 700;
-}
-.gr-button.primary:hover {
-    background: #f15f3e !important;
-}
-#status_display textarea, #status_display .gr-textbox {
-    min-height: 80px;
-    background: #f8fafc;
-    border-color: #e2e8f0;
-}
-#output_display textarea, #copy_output textarea, #exemplar_display textarea, #score_display textarea {
-    border-color: #e2e8f0;
-}
-.gr-block .gr-markdown h1, .gr-block .gr-markdown h2 {
-    color: #0f172a;
-}
-@media (max-width: 920px) {
-    .gradio-row {
-        flex-direction: column !important;
-    }
-    #app_header {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-}
-@media (max-width: 640px) {
-    .gradio-container {
-        padding: 16px 14px 24px;
-    }
-    .app-box {
-        padding: 18px;
-    }
-    .gr-button.primary {
-        min-height: 48px;
-    }
-    .app-title {
-        font-size: 1.75rem;
-    }
-}
-"""
 
 # ── Build index on startup if missing ─────────────────────────────────────────
 print("Checking index...")
@@ -127,248 +15,282 @@ else:
     print("Index found — skipping rebuild.")
 
 # ── Options ───────────────────────────────────────────────────────────────────
-MODELS = [
-    "claude-code",
-    "gpt-4",
-    "cursor",
-    "gemini",
-    "general",
-]
+MODELS = ["claude-code", "gpt-4", "cursor", "gemini", "general"]
+DEPTHS = ["concise", "standard", "comprehensive"]
 
-DEPTHS = [
-    "concise",
-    "standard",
-    "comprehensive",
-]
-
-# ── Core function called by Gradio ────────────────────────────────────────────
+# ── Core function ─────────────────────────────────────────────────────────────
 def forge(raw_prompt: str, target_model: str, depth: str):
-    raw_prompt = raw_prompt.strip()
-    if not raw_prompt:
-        return "", "⚠️ Please paste a prompt first.", "", "", ""
-    if len(raw_prompt) < 15:
-        return "", "⚠️ Prompt too short — please add more detail.", "", "", ""
+    if not raw_prompt.strip():
+        return "", "⚠ Enter a prompt to transform.", "", ""
+    if len(raw_prompt.strip()) < 15:
+        return "", "⚠ Prompt too short — add more detail.", "", ""
     if target_model not in MODELS:
-        return "", "⚠️ Invalid target model selected.", "", "", ""
+        return "", "⚠ Invalid model selected.", "", ""
     if depth not in DEPTHS:
-        return "", "⚠️ Invalid depth selected.", "", "", ""
+        return "", "⚠ Invalid depth selected.", "", ""
 
-    try:
-        result = run_pipeline(
-            raw_prompt   = raw_prompt,
-            target_model = target_model,
-            depth        = depth,
-        )
-    except Exception as e:
-        logger.exception("Unhandled error in forge()")
-        return "", f"❌ Error: {str(e)}", "", "", ""
+    result = run_pipeline(
+        raw_prompt   = raw_prompt,
+        target_model = target_model,
+        depth        = depth,
+    )
 
     if result["error"]:
-        return "", f"❌ Error: {result['error']}", "", "", ""
+        return "", f"✗ {result['error']}", "", ""
 
-    # Score the transformation
     score_result = score_transformation(
         raw_prompt   = raw_prompt,
         output       = result["transformed"],
         target_model = target_model,
         task_type    = result["task_type"],
     )
-    score_text = format_score_for_ui(score_result)
 
-    # Format exemplars
+    status = (
+        f"✓  {result['provider']}  ·  "
+        f"task: {result['task_type']}  ·  "
+        f"exemplars: {len(result['exemplars'])}  ·  "
+        f"score: {score_result['overall']}/10 — {score_result['grade']}"
+    )
+
     exemplar_text = ""
     if result["exemplars"]:
         for i, ex in enumerate(result["exemplars"], 1):
             exemplar_text += (
-                f"Exemplar {i}: [{ex.get('target_model')} / "
-                f"{ex.get('task_type')}] "
-                f"from {ex.get('source_repo')}\n"
+                f"{i}. [{ex.get('target_model')} / {ex.get('task_type')}] "
+                f"{ex.get('source_repo')}\n"
             )
     else:
         exemplar_text = "No exemplars retrieved."
 
-    usage = result.get("usage", {})
-    token_info = ""
-    if usage:
-        total_tokens = usage.get("total_tokens")
-        cost = usage.get("cost")
-        approximate = usage.get("approximate", False)
-        token_info = (
-            f" | Tokens: {total_tokens} "
-            f"| Cost: ${cost:.6f} "
-            f"({'approx' if approximate else 'exact'})"
-        )
-
-    stats = (
-        f"✅ Provider: {result['provider']}  |  "
-        f"Task: {result['task_type']}  |  "
-        f"Exemplars: {len(result['exemplars'])}  |  "
-        f"Score: {score_result['overall']}/10 — {score_result['grade']}"
-        f"{token_info}"
-    )
+    score_text = format_score_for_ui(score_result)
 
     return (
         result["transformed"],
-        stats,
+        status,
         exemplar_text,
-        result["transformed"],
         score_text,
     )
 
 
-# ── Gradio UI ─────────────────────────────────────────────────────────────────
-with gr.Blocks(title="Prompt Forge RAG", css=CSS) as demo:
+# ── CSS ───────────────────────────────────────────────────────────────────────
+CSS = """
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&display=swap');
 
-    with gr.Row(elem_id="app_header"):
-        with gr.Column(scale=1, min_width=0):
-            gr.Markdown(
-                """
-                <div class=\"app-label\">Prompt Forge RAG</div>
-                <div class=\"app-title\">Clean prompts. Faster results. Better models.</div>
-                <div class=\"app-subtitle\">Paste any messy prompt and get a polished, model-optimized instruction set ready for production.</div>
-                """
-            )
-        with gr.Column(scale=0, min_width=260):
-            gr.Markdown(
-                """
-                - ✅ Lightweight modern UI
-                - ✅ Token & cost visibility
-                - ✅ Mobile-friendly layout
-                """
-            )
+* { box-sizing: border-box; }
 
-    with gr.Row():
+body, .gradio-container {
+    background: #0d0d0d !important;
+    color: #e8e0d0 !important;
+    font-family: 'JetBrains Mono', monospace !important;
+}
 
-        # ── Left column — inputs ──────────────────────────────────────────────
+/* Hide gradio branding */
+footer { display: none !important; }
+.svelte-1kcf4d2 { display: none !important; }
+
+/* Header */
+.header-block {
+    border-bottom: 1px solid #222;
+    padding-bottom: 24px;
+    margin-bottom: 32px;
+}
+
+/* Labels */
+label span {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.12em !important;
+    text-transform: uppercase !important;
+    color: #666 !important;
+}
+
+/* Textareas and inputs */
+textarea, input {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 13px !important;
+    background: #111 !important;
+    border: 1px solid #222 !important;
+    color: #e8e0d0 !important;
+    border-radius: 2px !important;
+    line-height: 1.6 !important;
+}
+textarea:focus, input:focus {
+    border-color: #c4633e !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+/* Dropdowns */
+.wrap { background: #111 !important; border: 1px solid #222 !important; border-radius: 2px !important; }
+.wrap:hover { border-color: #444 !important; }
+select { background: #111 !important; color: #e8e0d0 !important; }
+
+/* Primary button */
+button.primary {
+    background: #c4633e !important;
+    color: #0d0d0d !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.15em !important;
+    text-transform: uppercase !important;
+    border: none !important;
+    border-radius: 2px !important;
+    padding: 14px 32px !important;
+    transition: background 0.15s ease !important;
+}
+button.primary:hover {
+    background: #d97842 !important;
+}
+
+/* Secondary buttons */
+button.secondary {
+    background: transparent !important;
+    color: #666 !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 11px !important;
+    border: 1px solid #222 !important;
+    border-radius: 2px !important;
+}
+button.secondary:hover {
+    border-color: #444 !important;
+    color: #e8e0d0 !important;
+}
+
+/* Status box */
+.status-box textarea {
+    font-size: 11.5px !important;
+    color: #6b8e4e !important;
+    background: #0d0d0d !important;
+    border: none !important;
+    border-top: 1px solid #1a1a1a !important;
+    padding-top: 8px !important;
+}
+
+/* Score box */
+.score-box textarea {
+    font-size: 11.5px !important;
+    color: #8a7a62 !important;
+    background: #111 !important;
+    line-height: 1.8 !important;
+}
+
+/* Exemplar box */
+.exemplar-box textarea {
+    font-size: 11px !important;
+    color: #555 !important;
+    background: #0d0d0d !important;
+    border-color: #1a1a1a !important;
+}
+
+/* Output box */
+.output-box textarea {
+    font-size: 13px !important;
+    line-height: 1.7 !important;
+    color: #e8e0d0 !important;
+    background: #111 !important;
+}
+
+/* Divider */
+.divider {
+    height: 1px;
+    background: #1a1a1a;
+    margin: 24px 0;
+}
+
+/* Accordion */
+.accordion {
+    background: #0d0d0d !important;
+    border: 1px solid #1a1a1a !important;
+    border-radius: 2px !important;
+}
+"""
+
+# ── UI ────────────────────────────────────────────────────────────────────────
+with gr.Blocks(title="Prompt Forge", css=CSS) as demo:
+
+    # Header
+    with gr.Group(elem_classes="header-block"):
+        gr.Markdown("""# Prompt Forge
+Transform messy prompts into structured, model-optimized instructions. Powered by RAG — 2158 real prompts from Claude Code, GPT-4, Cursor, and Gemini.""")
+
+    with gr.Row(equal_height=False):
+
+        # ── Left column ───────────────────────────────────────────────────────
         with gr.Column(scale=1):
-            with gr.Column(elem_classes=["app-box"]):
-                gr.Markdown("### Input")
-                raw_input = gr.Textbox(
-                    label       = "Your raw prompt",
-                    placeholder = "e.g. write me a python script that reads csv and finds duplicates...",
-                    lines       = 12,
+
+            raw_input = gr.Textbox(
+                label       = "Raw prompt",
+                placeholder = "Paste your messy prompt here...",
+                lines       = 10,
+            )
+
+            with gr.Row():
+                model_dropdown = gr.Dropdown(
+                    choices = MODELS,
+                    value   = "general",
+                    label   = "Target model",
+                )
+                depth_dropdown = gr.Dropdown(
+                    choices = DEPTHS,
+                    value   = "standard",
+                    label   = "Depth",
                 )
 
-                with gr.Row():
-                    model_dropdown = gr.Dropdown(
-                        choices = MODELS,
-                        value   = "general",
-                        label   = "Target model",
-                    )
-                    depth_dropdown = gr.Dropdown(
-                        choices = DEPTHS,
-                        value   = "standard",
-                        label   = "Depth",
-                    )
+            forge_btn = gr.Button(
+                "⚡ Forge",
+                variant = "primary",
+                size    = "lg",
+            )
 
-                forge_btn = gr.Button(
-                    "⚡ Forge it",
-                    variant = "primary",
-                    size    = "lg",
-                )
-
-            with gr.Column(elem_classes=["app-box"]):
-                gr.Markdown("### Retrieved exemplars")
+            with gr.Accordion("Retrieved exemplars", open=False, elem_classes="accordion"):
                 exemplar_display = gr.Textbox(
-                    label       = "Exemplars used as context",
-                    lines       = 5,
+                    label       = "Sources",
+                    lines       = 4,
                     interactive = False,
+                    elem_classes= "exemplar-box",
                 )
 
-            with gr.Column(elem_classes=["app-box"]):
-                gr.Markdown("### Quality score")
+            with gr.Accordion("Quality score", open=False, elem_classes="accordion"):
                 score_display = gr.Textbox(
-                    label       = "Transformation score breakdown",
+                    label       = "Score breakdown",
                     lines       = 8,
                     interactive = False,
-                    info        = "Automated quality assessment across 5 dimensions."
+                    elem_classes= "score-box",
                 )
 
-        # ── Right column — outputs ────────────────────────────────────────────
+        # ── Right column ──────────────────────────────────────────────────────
         with gr.Column(scale=1):
-            with gr.Column(elem_classes=["app-box"]):
-                gr.Markdown("### Output")
 
-                status_display = gr.Textbox(
-                    label       = "Status",
-                    lines       = 2,
-                    interactive = False,
-                    elem_id     = "status_display",
-                )
+            status_display = gr.Textbox(
+                label       = "Status",
+                lines       = 1,
+                interactive = False,
+                elem_classes= "status-box",
+            )
 
-                output_display = gr.Textbox(
-                    label       = "Transformed prompt",
-                    lines       = 20,
-                    interactive = False,
-                    elem_id     = "output_display",
-                )
+            output_display = gr.Textbox(
+                label       = "Transformed prompt",
+                lines       = 24,
+                interactive = True,
+                elem_classes= "output-box",
+                info        = "Editable — tweak before copying.",
+            )
 
-            with gr.Column(elem_classes=["app-box"]):
-                gr.Markdown("### Copy-paste ready")
-                copy_output = gr.Textbox(
-                    label       = "Editable prompt",
-                    lines       = 6,
-                    interactive = True,
-                    info        = "Make final tweaks here before copying.",
-                    elem_id     = "copy_output",
-                )
-
-    # ── Examples ─────────────────────────────────────────────────────────────
-    gr.Markdown("### Try these examples")
-    gr.Examples(
-        examples=[
-            [
-                "write me a python function that reads a csv and finds duplicate rows",
-                "claude-code",
-                "standard",
-            ],
-            [
-                "fix the bug in my code its not working",
-                "cursor",
-                "concise",
-            ],
-            [
-                "analyze this data and tell me whats interesting",
-                "gemini",
-                "comprehensive",
-            ],
-            [
-                "write a blog post about ai trends",
-                "gpt-4",
-                "standard",
-            ],
-            [
-                "make a system prompt for a customer support agent",
-                "general",
-                "comprehensive",
-            ],
-            [
-                "i want to build a n8n workflow that reads leads from google sheets and sends personalized emails",
-                "claude-code",
-                "comprehensive",
-            ],
-        ],
-        inputs=[raw_input, model_dropdown, depth_dropdown],
+    # Footer
+    gr.Markdown(
+        "Prompt Forge · BGE-small · LanceDB · Groq llama-3.3-70b · "
+        "[huggingface.co/spaces/Becher-zribi/prompt-forge-rag]"
+        "(https://huggingface.co/spaces/Becher-zribi/prompt-forge-rag)",
     )
 
-    # ── Wire up the button ────────────────────────────────────────────────────
+    # Wire up
     forge_btn.click(
         fn      = forge,
         inputs  = [raw_input, model_dropdown, depth_dropdown],
-        outputs = [
-            output_display,
-            status_display,
-            exemplar_display,
-            copy_output,
-            score_display,
-        ],
+        outputs = [output_display, status_display, exemplar_display, score_display],
     )
-
-    # ── Footer ────────────────────────────────────────────────────────────────
-    with gr.Row():
-        gr.Markdown(
-            '<div class="app-footer">Built with Gradio · BGE-small embeddings · LanceDB · Groq llama-3.3-70b · Cerebras fallback</div>'
-        )
 
 if __name__ == "__main__":
     demo.launch()
