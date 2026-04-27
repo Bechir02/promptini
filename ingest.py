@@ -34,7 +34,7 @@ def build_index(force: bool = False):
     db_dir = Path(DB_PATH)
 
     if db_dir.exists() and not force:
-        print(f"Index already exists at '{DB_PATH}'. Skipping rebuild.")
+        print(f"Index already exists. Skipping rebuild.")
         return
 
     print(f"Building index from '{PROMPTS_FILE}'...")
@@ -42,21 +42,27 @@ def build_index(force: bool = False):
     with open(PROMPTS_FILE, "r", encoding="utf-8") as f:
         prompts = json.load(f)
 
-    print(f"Loaded {len(prompts)} prompts.")
+    print(f"Loaded {len(prompts)} prompts. Embedding in batch...")
+
+    # Build all texts first
+    texts = [
+        f"Represent this sentence for retrieval: "
+        f"{p.get('task_type','')} "
+        f"{p.get('target_model','')} "
+        f"{p.get('prompt','')[:300]}"
+        for p in prompts
+    ]
+
+    # Batch embed all at once — much faster than one by one
+    vectors = embedder.encode(
+        texts,
+        normalize_embeddings = True,
+        batch_size           = 64,
+        show_progress_bar    = True,
+    )
 
     rows = []
-    for i, p in enumerate(prompts):
-        # Use cached embedding if available, else compute
-        if "embedding" in p:
-            vector = p["embedding"]
-        else:
-            embed_text = (
-                f"{p.get('task_type', '')} "
-                f"{p.get('target_model', '')} "
-                f"{p.get('prompt', '')[:300]}"
-            )
-            vector = embed(embed_text)
-
+    for i, (p, vector) in enumerate(zip(prompts, vectors)):
         rows.append({
             "id":           p.get("id", f"prompt_{i}"),
             "target_model": p.get("target_model", "general"),
@@ -65,7 +71,7 @@ def build_index(force: bool = False):
             "source_repo":  p.get("source_repo", ""),
             "license":      p.get("license", ""),
             "quality_score":float(p.get("quality_score", 5)),
-            "vector":       vector,
+            "vector":       vector.tolist(),
         })
 
     db = lancedb.connect(DB_PATH)
@@ -75,7 +81,7 @@ def build_index(force: bool = False):
     table = db.create_table(TABLE_NAME, data=rows)
     print(f"Created table '{TABLE_NAME}' with {len(rows)} rows.")
     print("Index build complete.")
-
+    
 # ── Retrieve function (used by rag.py) ───────────────────────────────────────
 def get_table():
     """Return the LanceDB table, building index first if needed."""
