@@ -1,10 +1,11 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 import gradio as gr
 from rag import run_pipeline
 from ingest import build_index
 from pathlib import Path
 from scorer import score_transformation, format_score_for_ui
-from dotenv import load_dotenv
-load_dotenv()
 
 # ── Build index on startup if missing ─────────────────────────────────────────
 print("Checking index...")
@@ -14,20 +15,19 @@ if not Path("lancedb_store").exists():
 else:
     print("Index found — skipping rebuild.")
 
-# ── Options ───────────────────────────────────────────────────────────────────
 MODELS = ["claude-code", "gpt-4", "cursor", "gemini", "general"]
 DEPTHS = ["concise", "standard", "comprehensive"]
 
 # ── Core function ─────────────────────────────────────────────────────────────
 def forge(raw_prompt: str, target_model: str, depth: str):
     if not raw_prompt.strip():
-        return "", "⚠ Enter a prompt to transform.", "", ""
+        return "", "", "", "", ""
     if len(raw_prompt.strip()) < 15:
-        return "", "⚠ Prompt too short — add more detail.", "", ""
+        return "", "⚠ Prompt too short — add more detail.", "", "", ""
     if target_model not in MODELS:
-        return "", "⚠ Invalid model selected.", "", ""
+        return "", "⚠ Invalid model.", "", "", ""
     if depth not in DEPTHS:
-        return "", "⚠ Invalid depth selected.", "", ""
+        return "", "⚠ Invalid depth.", "", "", ""
 
     result = run_pipeline(
         raw_prompt   = raw_prompt,
@@ -36,7 +36,7 @@ def forge(raw_prompt: str, target_model: str, depth: str):
     )
 
     if result["error"]:
-        return "", f"✗ {result['error']}", "", ""
+        return "", f"✗ {result['error']}", "", "", ""
 
     score_result = score_transformation(
         raw_prompt   = raw_prompt,
@@ -45,165 +45,203 @@ def forge(raw_prompt: str, target_model: str, depth: str):
         task_type    = result["task_type"],
     )
 
-    status = (
-        f"✓  {result['provider']}  ·  "
-        f"task: {result['task_type']}  ·  "
-        f"exemplars: {len(result['exemplars'])}  ·  "
-        f"score: {score_result['overall']}/10 — {score_result['grade']}"
-    )
-
     exemplar_text = ""
     if result["exemplars"]:
         for i, ex in enumerate(result["exemplars"], 1):
             exemplar_text += (
-                f"{i}. [{ex.get('target_model')} / {ex.get('task_type')}] "
+                f"{i:02d}  [{ex.get('target_model')}]  "
+                f"{ex.get('task_type')}  ·  "
                 f"{ex.get('source_repo')}\n"
             )
     else:
         exemplar_text = "No exemplars retrieved."
 
     score_text = format_score_for_ui(score_result)
+    meta = (
+        f"{len(result['transformed'])} chars · "
+        f"{len(result['transformed'].split())} words"
+    )
 
     return (
         result["transformed"],
-        status,
+        meta,
         exemplar_text,
         score_text,
+        f"✓ {result['provider']} · task: {result['task_type']} · score: {score_result['overall']}/10",
     )
 
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
 CSS = """
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
 
-* { box-sizing: border-box; }
+* { font-family: 'DM Sans', sans-serif !important; box-sizing: border-box; }
 
-body, .gradio-container {
-    background: #0d0d0d !important;
-    color: #e8e0d0 !important;
-    font-family: 'JetBrains Mono', monospace !important;
+body, .gradio-container, .main, .wrap {
+    background: #edecea !important;
+    font-family: 'DM Sans', sans-serif !important;
 }
 
-/* Hide gradio branding */
-footer { display: none !important; }
-.svelte-1kcf4d2 { display: none !important; }
+footer, .footer { display: none !important; }
+.hide-footer { display: none !important; }
 
 /* Header */
-.header-block {
-    border-bottom: 1px solid #222;
-    padding-bottom: 24px;
-    margin-bottom: 32px;
+.pf-header {
+    text-align: center;
+    padding: 32px 24px 28px;
+    background: transparent;
+}
+
+/* Panels */
+.panel-card {
+    background: white !important;
+    border-radius: 22px !important;
+    border: none !important;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04) !important;
+    padding: 22px !important;
+}
+
+.bottom-card {
+    background: white !important;
+    border-radius: 20px !important;
+    border: none !important;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.03) !important;
+    padding: 20px 22px !important;
 }
 
 /* Labels */
-label span {
-    font-family: 'JetBrains Mono', monospace !important;
+label > span, .form > label > span {
     font-size: 11px !important;
     font-weight: 500 !important;
-    letter-spacing: 0.12em !important;
+    color: #bbb !important;
     text-transform: uppercase !important;
-    color: #666 !important;
+    letter-spacing: 0.07em !important;
+    font-family: 'DM Sans', sans-serif !important;
 }
 
-/* Textareas and inputs */
-textarea, input {
-    font-family: 'JetBrains Mono', monospace !important;
-    font-size: 13px !important;
-    background: #111 !important;
-    border: 1px solid #222 !important;
-    color: #e8e0d0 !important;
-    border-radius: 2px !important;
-    line-height: 1.6 !important;
+/* Textareas */
+textarea {
+    font-family: 'DM Sans', sans-serif !important;
+    font-size: 14px !important;
+    color: #2a2a28 !important;
+    background: white !important;
+    border: 0.5px solid #ebebea !important;
+    border-radius: 14px !important;
+    line-height: 1.75 !important;
+    padding: 14px 16px !important;
+    min-height: 320px !important;
+    resize: none !important;
 }
-textarea:focus, input:focus {
+
+textarea:focus {
     border-color: #c4633e !important;
+    box-shadow: 0 0 0 3px rgba(196,99,62,0.07) !important;
     outline: none !important;
+}
+
+textarea::placeholder { color: #ccc !important; }
+
+/* Output textarea — monospace */
+.output-text textarea {
+    font-family: 'DM Mono', monospace !important;
+    font-size: 13px !important;
+    color: #333 !important;
+    line-height: 1.85 !important;
+}
+
+/* Score and exemplar textareas */
+.score-text textarea, .exemplar-text textarea {
+    font-family: 'DM Mono', monospace !important;
+    font-size: 12px !important;
+    color: #555 !important;
+    min-height: 140px !important;
+    background: #fafaf9 !important;
+    border-color: #f0f0ee !important;
+    line-height: 1.8 !important;
+}
+
+/* Status box */
+.status-text textarea {
+    font-size: 12px !important;
+    color: #5a9e4a !important;
+    background: #f8faf7 !important;
+    border-color: #e8f0e5 !important;
+    min-height: 44px !important;
+    font-family: 'DM Sans', sans-serif !important;
+}
+
+/* Meta box */
+.meta-text textarea {
+    font-size: 11.5px !important;
+    color: #bbb !important;
+    background: transparent !important;
+    border: none !important;
+    min-height: 24px !important;
+    padding: 0 !important;
     box-shadow: none !important;
 }
 
 /* Dropdowns */
-.wrap { background: #111 !important; border: 1px solid #222 !important; border-radius: 2px !important; }
-.wrap:hover { border-color: #444 !important; }
-select { background: #111 !important; color: #e8e0d0 !important; }
+.gr-dropdown, select, .wrap.svelte-w6rprc {
+    background: #f7f7f5 !important;
+    border: 0.5px solid #ebebea !important;
+    border-radius: 20px !important;
+    font-size: 13px !important;
+    color: #333 !important;
+    font-family: 'DM Sans', sans-serif !important;
+    font-weight: 500 !important;
+    padding: 8px 14px !important;
+}
 
 /* Primary button */
-button.primary {
+button.primary, .primary {
     background: #c4633e !important;
-    color: #0d0d0d !important;
-    font-family: 'JetBrains Mono', monospace !important;
-    font-size: 12px !important;
-    font-weight: 600 !important;
-    letter-spacing: 0.15em !important;
-    text-transform: uppercase !important;
+    color: white !important;
     border: none !important;
-    border-radius: 2px !important;
-    padding: 14px 32px !important;
-    transition: background 0.15s ease !important;
-}
-button.primary:hover {
-    background: #d97842 !important;
-}
-
-/* Secondary buttons */
-button.secondary {
-    background: transparent !important;
-    color: #666 !important;
-    font-family: 'JetBrains Mono', monospace !important;
-    font-size: 11px !important;
-    border: 1px solid #222 !important;
-    border-radius: 2px !important;
-}
-button.secondary:hover {
-    border-color: #444 !important;
-    color: #e8e0d0 !important;
-}
-
-/* Status box */
-.status-box textarea {
-    font-size: 11.5px !important;
-    color: #6b8e4e !important;
-    background: #0d0d0d !important;
-    border: none !important;
-    border-top: 1px solid #1a1a1a !important;
-    padding-top: 8px !important;
-}
-
-/* Score box */
-.score-box textarea {
-    font-size: 11.5px !important;
-    color: #8a7a62 !important;
-    background: #111 !important;
-    line-height: 1.8 !important;
-}
-
-/* Exemplar box */
-.exemplar-box textarea {
-    font-size: 11px !important;
-    color: #555 !important;
-    background: #0d0d0d !important;
-    border-color: #1a1a1a !important;
-}
-
-/* Output box */
-.output-box textarea {
+    border-radius: 20px !important;
     font-size: 13px !important;
-    line-height: 1.7 !important;
-    color: #e8e0d0 !important;
-    background: #111 !important;
+    font-weight: 600 !important;
+    padding: 12px 24px !important;
+    font-family: 'DM Sans', sans-serif !important;
+    transition: background 0.15s !important;
+    box-shadow: none !important;
 }
 
-/* Divider */
-.divider {
-    height: 1px;
-    background: #1a1a1a;
-    margin: 24px 0;
+button.primary:hover { background: #d97040 !important; }
+
+/* Secondary button */
+button.secondary, .secondary {
+    background: #f7f7f5 !important;
+    color: #555 !important;
+    border: 0.5px solid #ebebea !important;
+    border-radius: 20px !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    padding: 12px 24px !important;
+    font-family: 'DM Sans', sans-serif !important;
+    box-shadow: none !important;
+}
+
+button.secondary:hover { background: #efefed !important; }
+
+/* Remove all gradio default borders and backgrounds */
+.form, .block, .gap, .padded {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.gr-group, .gr-box {
+    background: transparent !important;
+    border: none !important;
 }
 
 /* Accordion */
-.accordion {
-    background: #0d0d0d !important;
-    border: 1px solid #1a1a1a !important;
-    border-radius: 2px !important;
+.gr-accordion {
+    background: white !important;
+    border-radius: 16px !important;
+    border: 0.5px solid #f0f0ee !important;
+    box-shadow: none !important;
 }
 """
 
@@ -211,19 +249,25 @@ button.secondary:hover {
 with gr.Blocks(title="Prompt Forge", css=CSS) as demo:
 
     # Header
-    with gr.Group(elem_classes="header-block"):
-        gr.Markdown("""# Prompt Forge
-Transform messy prompts into structured, model-optimized instructions. Powered by RAG — 2158 real prompts from Claude Code, GPT-4, Cursor, and Gemini.""")
+    gr.Markdown("""
+<div class="pf-header">
+<div style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:500;color:#c4633e;background:white;border:0.5px solid #f0d0c0;padding:5px 14px;border-radius:20px;margin-bottom:18px;">⚡ RAG · 2,158 prompts</div>
+<h1 style="font-size:32px;font-weight:600;color:#1c1c1a;letter-spacing:-0.04em;line-height:1.18;margin-bottom:12px;font-family:'DM Sans',sans-serif;">Turn messy prompts into <span style="color:#c4633e;">structured instructions</span></h1>
+<p style="font-size:14px;color:#999;line-height:1.65;max-width:460px;margin:0 auto;font-family:'DM Sans',sans-serif;">Model-aware transformation grounded in real prompts from Claude Code, GPT-4, Cursor, and Gemini.</p>
+</div>
+""")
 
+    # Main two columns
     with gr.Row(equal_height=False):
 
-        # ── Left column ───────────────────────────────────────────────────────
-        with gr.Column(scale=1):
+        # Left — input
+        with gr.Column(scale=1, elem_classes="panel-card"):
 
             raw_input = gr.Textbox(
-                label       = "Raw prompt",
-                placeholder = "Paste your messy prompt here...",
-                lines       = 10,
+                label       = "Your prompt",
+                placeholder = "Paste anything — rough notes, half-formed ideas, a messy first draft...",
+                lines       = 16,
+                max_lines   = 24,
             )
 
             with gr.Row():
@@ -239,57 +283,91 @@ Transform messy prompts into structured, model-optimized instructions. Powered b
                 )
 
             forge_btn = gr.Button(
-                "⚡ Forge",
+                "⚡ Transform prompt",
                 variant = "primary",
                 size    = "lg",
             )
 
-            with gr.Accordion("Retrieved exemplars", open=False, elem_classes="accordion"):
-                exemplar_display = gr.Textbox(
-                    label       = "Sources",
-                    lines       = 4,
-                    interactive = False,
-                    elem_classes= "exemplar-box",
-                )
-
-            with gr.Accordion("Quality score", open=False, elem_classes="accordion"):
-                score_display = gr.Textbox(
-                    label       = "Score breakdown",
-                    lines       = 8,
-                    interactive = False,
-                    elem_classes= "score-box",
-                )
-
-        # ── Right column ──────────────────────────────────────────────────────
-        with gr.Column(scale=1):
+        # Right — output
+        with gr.Column(scale=1, elem_classes="panel-card"):
 
             status_display = gr.Textbox(
                 label       = "Status",
                 lines       = 1,
                 interactive = False,
-                elem_classes= "status-box",
+                elem_classes= "status-text",
             )
 
             output_display = gr.Textbox(
-                label       = "Transformed prompt",
-                lines       = 24,
+                label       = "Structured prompt",
+                lines       = 16,
+                max_lines   = 24,
                 interactive = True,
-                elem_classes= "output-box",
-                info        = "Editable — tweak before copying.",
+                elem_classes= "output-text",
+            )
+
+            output_meta = gr.Textbox(
+                label       = "",
+                lines       = 1,
+                interactive = False,
+                elem_classes= "meta-text",
+            )
+
+            copy_btn = gr.Button(
+                "Copy to clipboard",
+                variant = "secondary",
+                size    = "lg",
+            )
+
+    # Bottom row
+    with gr.Row(equal_height=True):
+
+        with gr.Column(scale=1, elem_classes="bottom-card"):
+            exemplar_display = gr.Textbox(
+                label       = "Retrieved exemplars",
+                lines       = 6,
+                interactive = False,
+                elem_classes= "exemplar-text",
+            )
+
+        with gr.Column(scale=1, elem_classes="bottom-card"):
+            score_display = gr.Textbox(
+                label       = "Quality score",
+                lines       = 6,
+                interactive = False,
+                elem_classes= "score-text",
             )
 
     # Footer
-    gr.Markdown(
-        "Prompt Forge · BGE-small · LanceDB · Groq llama-3.3-70b · "
-        "[huggingface.co/spaces/Becher-zribi/prompt-forge-rag]"
-        "(https://huggingface.co/spaces/Becher-zribi/prompt-forge-rag)",
+    gr.Markdown("""
+<div style="text-align:center;padding:16px 0 4px;">
+<span style="font-size:11.5px;color:#bbb;font-family:'DM Sans',sans-serif;">
+BGE-small · LanceDB · Groq llama-3.3-70b · Cerebras fallback · 
+<a href="https://huggingface.co/spaces/Becher-zribi/prompt-forge-rag" 
+   style="color:#bbb;text-decoration:none;">huggingface.co/spaces/Becher-zribi/prompt-forge-rag</a>
+</span>
+</div>
+""")
+
+    # Copy to clipboard JS
+    copy_btn.click(
+        fn      = None,
+        inputs  = [output_display],
+        outputs = [],
+        js      = "async (text) => { await navigator.clipboard.writeText(text); }",
     )
 
-    # Wire up
+    # Forge
     forge_btn.click(
         fn      = forge,
         inputs  = [raw_input, model_dropdown, depth_dropdown],
-        outputs = [output_display, status_display, exemplar_display, score_display],
+        outputs = [
+            output_display,
+            status_display,
+            exemplar_display,
+            score_display,
+            output_meta,
+        ],
     )
 
 if __name__ == "__main__":
