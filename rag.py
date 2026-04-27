@@ -1,6 +1,7 @@
 from ingest import retrieve
 from llm import transform_prompt
 
+
 def detect_task_type(raw_prompt: str) -> str:
     """
     Keyword-based task type detector.
@@ -8,65 +9,80 @@ def detect_task_type(raw_prompt: str) -> str:
     """
     prompt_lower = raw_prompt.lower()
 
-    # Extraction first — before code_generation to avoid false matches
+    # Extraction first — very specific fields/data pulling language
     if any(w in prompt_lower for w in [
-        "extract", "parse", "pull out", "get fields", "find all",
-        "pull", "grab", "fetch fields", "get the", "retrieve fields"
+        "extract", "pull out", "get fields", "fetch fields",
+        "retrieve fields", "parse json", "parse xml",
+        "pull the", "grab the fields"
     ]):
         return "extraction"
 
-    if any(w in prompt_lower for w in [
-        "fix", "debug", "error", "bug", "issue", "broken",
-        "crash", "exception", "not working", "fails"
-    ]):
-        return "debugging"
-
-    if any(w in prompt_lower for w in [
-        "review", "check", "audit", "evaluate", "assess", "critique"
-    ]):
-        return "code_review"
-
-    if any(w in prompt_lower for w in [
-        "refactor", "clean", "improve", "optimize",
-        "restructure", "simplify"
-    ]):
-        return "refactoring"
-
-    if any(w in prompt_lower for w in [
-        "document", "docs", "docstring", "readme",
-        "comment", "explain"
-    ]):
-        return "documentation"
-
-    if any(w in prompt_lower for w in [
-        "analyze", "analysis", "compare", "research",
-        "investigate", "study"
-    ]):
-        return "analysis"
-
-    if any(w in prompt_lower for w in [
-        "summarize", "summary", "tldr", "brief",
-        "overview", "recap"
-    ]):
-        return "summarization"
-
+    # System prompt / agent persona
     if any(w in prompt_lower for w in [
         "system prompt", "persona", "act as",
-        "you are", "role", "agent"
+        "you are a", "build an agent", "make an agent",
+        "create an agent", "design an agent"
     ]):
         return "system_prompt"
 
+    # Code review — before debugging to catch "check for bugs"
     if any(w in prompt_lower for w in [
-        "write", "create", "build", "implement", "generate", "code",
-        "function", "class", "script", "program", "develop"
+        "review", "audit", "evaluate", "assess", "critique",
+        "check for bugs", "check for issues", "check for errors",
+        "monitor", "scan for", "look for issues"
     ]):
-        return "code_generation"
+        return "code_review"
 
+    # Debugging — only if NOT about reviewing/monitoring
     if any(w in prompt_lower for w in [
-        "story", "essay", "blog", "article",
-        "creative", "poem", "write"
+        "fix", "debug", "error", "bug", "issue", "broken",
+        "crash", "exception", "not working", "fails"
+    ]) and not any(w in prompt_lower for w in [
+        "review", "monitor", "check for", "agent", "scan"
+    ]):
+        return "debugging"
+
+    # Refactoring
+    if any(w in prompt_lower for w in [
+        "refactor", "clean up", "improve", "optimize",
+        "restructure", "simplify", "rewrite"
+    ]):
+        return "refactoring"
+
+    # Documentation
+    if any(w in prompt_lower for w in [
+        "document", "docs", "docstring", "readme",
+        "comment", "explain this code"
+    ]):
+        return "documentation"
+
+    # Analysis
+    if any(w in prompt_lower for w in [
+        "analyze", "analysis", "compare", "research",
+        "investigate", "study", "examine"
+    ]):
+        return "analysis"
+
+    # Summarization
+    if any(w in prompt_lower for w in [
+        "summarize", "summary", "tldr", "brief",
+        "overview", "recap", "condense"
+    ]):
+        return "summarization"
+
+    # Creative writing
+    if any(w in prompt_lower for w in [
+        "story", "essay", "blog post", "article",
+        "creative", "poem", "write about"
     ]):
         return "writing"
+
+    # Code generation — broad, so runs late
+    if any(w in prompt_lower for w in [
+        "write", "create", "build", "implement", "generate",
+        "code", "function", "class", "script", "program", "develop"
+    ]):
+        return "code_generation"
 
     return "general"
 
@@ -132,10 +148,24 @@ def run_pipeline(
 # ── Quick test ────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     tests = [
-        ("pull out the user id and email from this json", "general"),
-        ("fix the bug in my login function", "cursor"),
-        ("write a python csv duplicate finder", "claude-code"),
+        # (prompt, expected_task_type)
+        ("pull out the user id and email from this json",           "extraction"),
+        ("fix the bug in my login function",                        "debugging"),
+        ("write a python csv duplicate finder",                     "code_generation"),
+        ("make an agent that monitors my repo and checks for bugs", "code_review"),
+        ("review this code for security issues",                    "code_review"),
+        ("build an agent that acts as a customer support bot",      "system_prompt"),
+        ("summarize this document",                                 "summarization"),
+        ("refactor this function to be cleaner",                    "refactoring"),
     ]
-    for prompt, model in tests:
+
+    print("── Task Detection Tests ─────────────────────────────")
+    all_passed = True
+    for prompt, expected in tests:
         detected = detect_task_type(prompt)
-        print(f"'{prompt[:50]}' → {detected}")
+        status   = "✅" if detected == expected else "❌"
+        if detected != expected:
+            all_passed = False
+        print(f"{status} '{prompt[:50]}' → {detected} (expected: {expected})")
+
+    print(f"\n{'✅ All tests passed!' if all_passed else '❌ Some tests failed — review above'}")
