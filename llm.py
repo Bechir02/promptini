@@ -8,7 +8,7 @@ GEMINI_API_KEY   = os.environ.get("GEMINI_API_KEY", "")
 CEREBRAS_API_KEY = os.environ.get("CEREBRAS_API_KEY", "")
 
 # ── Model config ──────────────────────────────────────────────────────────────
-GEMINI_MODEL   = "gemini-2.0-flash"
+GEMINI_MODEL = "gemini-2.0-flash-lite"
 CEREBRAS_MODEL = "llama3.1-8b"
 
 # ── Model-specific rules ──────────────────────────────────────────────────────
