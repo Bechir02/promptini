@@ -1,0 +1,14 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "npm: compile extension",
+      "type": "npm",
+      "script": "compile",
+      "path": "vscode-extension/",
+      "group": "build",
+      "problemMatcher": "$tsc",
+      "detail": "tsc -p ./"
+    }
+  ]
+}

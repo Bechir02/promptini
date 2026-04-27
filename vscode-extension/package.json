@@ -1,0 +1,42 @@
+{
+  "name": "prompt-forge-vscode",
+  "displayName": "Prompt Forge",
+  "description": "Open the Prompt Forge Gradio app inside VS Code.",
+  "version": "0.1.0",
+  "publisher": "promptforge",
+  "engines": {
+    "vscode": "^1.88.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:promptForge.open",
+    "onCommand:promptForge.stop"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "promptForge.open",
+        "title": "Prompt Forge: Open App"
+      },
+      {
+        "command": "promptForge.stop",
+        "title": "Prompt Forge: Stop App"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -p ./ --watch",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.88.0",
+    "@vscode/vsce": "^2.29.0",
+    "typescript": "^5.6.0"
+  }
+}

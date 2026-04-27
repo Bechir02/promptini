@@ -5,7 +5,8 @@ from rag import run_pipeline
 from ingest import build_index
 from pathlib import Path
 from scorer import score_transformation, format_score_for_ui
-
+from dotenv import load_dotenv
+load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -240,7 +241,7 @@ with gr.Blocks(title="Prompt Forge RAG", css=CSS) as demo:
 
         # ── Left column — inputs ──────────────────────────────────────────────
         with gr.Column(scale=1):
-            with gr.Box():
+            with gr.Column(elem_classes=["app-box"]):
                 gr.Markdown("### Input")
                 raw_input = gr.Textbox(
                     label       = "Your raw prompt",
@@ -266,7 +267,7 @@ with gr.Blocks(title="Prompt Forge RAG", css=CSS) as demo:
                     size    = "lg",
                 )
 
-            with gr.Box():
+            with gr.Column(elem_classes=["app-box"]):
                 gr.Markdown("### Retrieved exemplars")
                 exemplar_display = gr.Textbox(
                     label       = "Exemplars used as context",
@@ -274,7 +275,7 @@ with gr.Blocks(title="Prompt Forge RAG", css=CSS) as demo:
                     interactive = False,
                 )
 
-            with gr.Box():
+            with gr.Column(elem_classes=["app-box"]):
                 gr.Markdown("### Quality score")
                 score_display = gr.Textbox(
                     label       = "Transformation score breakdown",
@@ -285,7 +286,7 @@ with gr.Blocks(title="Prompt Forge RAG", css=CSS) as demo:
 
         # ── Right column — outputs ────────────────────────────────────────────
         with gr.Column(scale=1):
-            with gr.Box():
+            with gr.Column(elem_classes=["app-box"]):
                 gr.Markdown("### Output")
 
                 status_display = gr.Textbox(
@@ -302,7 +303,7 @@ with gr.Blocks(title="Prompt Forge RAG", css=CSS) as demo:
                     elem_id     = "output_display",
                 )
 
-            with gr.Box():
+            with gr.Column(elem_classes=["app-box"]):
                 gr.Markdown("### Copy-paste ready")
                 copy_output = gr.Textbox(
                     label       = "Editable prompt",

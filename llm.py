@@ -379,7 +379,10 @@ def call_groq(system_prompt: str, user_prompt: str):
         max_tokens  = 1000,
         temperature = 0.4,
     )
-    return response.choices[0].message.content.strip(), response
+    content = response.choices[0].message.content
+    if content is None:
+        raise ValueError("LLM response content is None")
+    return content.strip(), response
 
 
 # ── Cerebras fallback ─────────────────────────────────────────────────────────
@@ -396,7 +399,10 @@ def call_cerebras(system_prompt: str, user_prompt: str):
         ],
         max_tokens = 1000,
     )
-    return response.choices[0].message.content.strip(), response
+    content = response.choices[0].message.content
+    if content is None:
+        raise ValueError("LLM response content is None")
+    return content.strip(), response
 
 
 def validate_transformed_prompt(result: str, target_model: str) -> None:
