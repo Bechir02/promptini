@@ -364,37 +364,5 @@ with gr.Blocks(title="Prompt Forge", css=CSS) as demo:
                 elem_classes= "score-text",
             )
 
-    # Footer
-    gr.Markdown("""
-<div style="text-align:center;padding:16px 0 4px;">
-<span style="font-size:11.5px;color:#bbb;font-family:'DM Sans',sans-serif;">
-BGE-small · LanceDB · Groq llama-3.3-70b · Cerebras fallback · 
-<a href="https://huggingface.co/spaces/Becher-zribi/prompt-forge-rag" 
-   style="color:#bbb;text-decoration:none;">huggingface.co/spaces/Becher-zribi/prompt-forge-rag</a>
-</span>
-</div>
-""")
-
-    # Copy to clipboard JS
-    copy_btn.click(
-        fn      = None,
-        inputs  = [output_display],
-        outputs = [],
-        js      = "async (text) => { if (text && text.trim()) await navigator.clipboard.writeText(text); }",
-    )
-
-    # Forge
-    forge_btn.click(
-        fn      = forge,
-        inputs  = [raw_input, model_dropdown, depth_dropdown],
-        outputs = [
-            output_display,
-            status_display,
-            exemplar_display,
-            score_display,
-            output_meta,
-        ],
-    )
-
 if __name__ == "__main__":
     demo.launch()
