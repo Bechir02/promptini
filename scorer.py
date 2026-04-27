@@ -87,8 +87,8 @@ def score_structure(output: str, target_model: str) -> dict:
     }
 
 
-def score_specificity(output: str) -> dict:
-    """Penalize vague words, reward concrete language."""
+def score_specificity(raw: str, output: str) -> dict:
+    """Penalize vague words, reward concrete language, and preserve placeholders."""
     output_lower = output.lower()
     found_vague  = [w for w in VAGUE_WORDS if w in output_lower]
 
@@ -109,15 +109,24 @@ def score_specificity(output: str) -> dict:
     )
     score = min(score + bonuses * 0.4, 10.0)
 
+    placeholders = re.findall(r"\{[\w_-]+\}", raw)
+    missing_placeholders = [p for p in placeholders if p not in output]
+    if missing_placeholders:
+        deduction += min(len(missing_placeholders) * 2.0, 6.0)
+        score = max(10.0 - deduction, 0.0)
+
+    note = []
+    if found_vague:
+        note.append(f"Found {len(found_vague)} vague words")
+    if missing_placeholders:
+        note.append(f"missing placeholders: {', '.join(missing_placeholders)}")
+    if not note:
+        note = ["No vague wording or placeholder drift detected. ✓"]
+
     return {
         "score":       round(score, 1),
         "vague_words": found_vague,
-        "note": (
-            f"Found {len(found_vague)} vague words: "
-            f"{', '.join(found_vague[:3])}"
-            if found_vague
-            else "No vague words detected. ✓"
-        ),
+        "note":        "; ".join(note),
     }
 
 
@@ -171,14 +180,17 @@ def score_improvement(raw: str, output: str) -> dict:
     if ratio < 1.2:
         score = 3.0
         note  = "Output barely longer than input — likely too thin."
-    elif ratio < 2.0:
-        score = 6.0
-        note  = "Moderate improvement over input."
-    elif ratio <= 5.0:
-        score = 10.0
+    elif ratio < 1.8:
+        score = 5.0
+        note  = "Small improvement over input."
+    elif ratio <= 3.5:
+        score = 9.0
         note  = f"Good expansion — {ratio:.1f}x longer than input. ✓"
+    elif ratio <= 5.0:
+        score = 8.0
+        note  = f"Very detailed output — review for conciseness."
     else:
-        score = 7.0
+        score = 6.0
         note  = f"Very long ({ratio:.1f}x) — may have unnecessary padding."
 
     return {
@@ -202,7 +214,7 @@ def score_transformation(
     Returns overall score out of 10 with full breakdown.
     """
     structure   = score_structure(output, target_model)
-    specificity = score_specificity(output)
+    specificity = score_specificity(raw_prompt, output)
     model_aware = score_model_awareness(output, target_model)
     task_cover  = score_task_coverage(output, task_type)
     improvement = score_improvement(raw_prompt, output)

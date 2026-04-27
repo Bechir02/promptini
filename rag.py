@@ -1,5 +1,12 @@
+import logging
+import time
+
 from ingest import retrieve
 from llm import transform_prompt
+
+logger = logging.getLogger(__name__)
+ALLOWED_MODELS = {"claude-code", "gpt-4", "cursor", "gemini", "general"}
+ALLOWED_DEPTHS = {"concise", "standard", "comprehensive"}
 
 
 def detect_task_type(raw_prompt: str) -> str:
@@ -101,9 +108,17 @@ def run_pipeline(
     4. Return result dict with all metadata
     """
 
+    if target_model not in ALLOWED_MODELS:
+        logger.warning("Invalid target_model '%s' — defaulting to general", target_model)
+        target_model = "general"
+    if depth not in ALLOWED_DEPTHS:
+        logger.warning("Invalid depth '%s' — defaulting to standard", depth)
+        depth = "standard"
+
     # Step 1 — detect task type
     task_type = detect_task_type(raw_prompt)
-    print(f"Detected task type: {task_type}")
+    logger.info("Detected task type: %s", task_type)
+    start_time = time.perf_counter()
 
     # Step 2 — retrieve exemplars
     try:
@@ -113,9 +128,9 @@ def run_pipeline(
             task_type    = task_type,
             top_k        = top_k,
         )
-        print(f"Retrieved {len(exemplars)} exemplars.")
+        logger.info("Retrieved %d exemplars.", len(exemplars))
     except Exception as e:
-        print(f"Retrieval failed: {e} — proceeding without exemplars.")
+        logger.exception("Retrieval failed — proceeding without exemplars.")
         exemplars = []
 
     # Step 3 — transform
@@ -127,6 +142,8 @@ def run_pipeline(
             depth        = depth,
             exemplars    = exemplars,
         )
+        elapsed = time.perf_counter() - start_time
+        logger.info("Transformation completed with provider %s in %.2fs", provider, elapsed)
         return {
             "transformed": transformed,
             "provider":    provider,
@@ -136,6 +153,7 @@ def run_pipeline(
         }
 
     except Exception as e:
+        logger.exception("Transformation failed.")
         return {
             "transformed": "",
             "provider":    "none",

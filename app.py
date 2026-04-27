@@ -1,8 +1,13 @@
+import logging
+
 import gradio as gr
 from rag import run_pipeline
 from ingest import build_index
 from pathlib import Path
 from scorer import score_transformation, format_score_for_ui
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
 
 # ── Build index on startup if missing ─────────────────────────────────────────
 print("Checking index...")
@@ -29,14 +34,25 @@ DEPTHS = [
 
 # ── Core function called by Gradio ────────────────────────────────────────────
 def forge(raw_prompt: str, target_model: str, depth: str):
-    if not raw_prompt.strip():
+    raw_prompt = raw_prompt.strip()
+    if not raw_prompt:
         return "", "⚠️ Please paste a prompt first.", "", "", ""
+    if len(raw_prompt) < 15:
+        return "", "⚠️ Prompt too short — please add more detail.", "", "", ""
+    if target_model not in MODELS:
+        return "", "⚠️ Invalid target model selected.", "", "", ""
+    if depth not in DEPTHS:
+        return "", "⚠️ Invalid depth selected.", "", "", ""
 
-    result = run_pipeline(
-        raw_prompt   = raw_prompt,
-        target_model = target_model,
-        depth        = depth,
-    )
+    try:
+        result = run_pipeline(
+            raw_prompt   = raw_prompt,
+            target_model = target_model,
+            depth        = depth,
+        )
+    except Exception as e:
+        logger.exception("Unhandled error in forge()")
+        return "", f"❌ Error: {str(e)}", "", "", ""
 
     if result["error"]:
         return "", f"❌ Error: {result['error']}", "", "", ""

@@ -1,9 +1,12 @@
+import functools
+import logging
 import os
 import json
 import lancedb
-import numpy as np
 from sentence_transformers import SentenceTransformer
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # ── Config ──────────────────────────────────────────────────────────────────
 PROMPTS_FILE = "prompts.json"
@@ -16,12 +19,15 @@ print("Loading embedding model...")
 embedder = SentenceTransformer(MODEL_NAME)
 print("Model loaded.")
 
-def embed(text: str) -> list[float]:
-    """Embed a single string using BGE-small.
-    BGE models perform best with a query instruction prefix."""
+@functools.lru_cache(maxsize=256)
+def _embed_cached(text: str) -> tuple[float, ...]:
     prefixed = f"Represent this sentence for retrieval: {text}"
     vector   = embedder.encode(prefixed, normalize_embeddings=True)
-    return vector.tolist()
+    return tuple(vector.tolist())
+
+def embed(text: str) -> list[float]:
+    """Embed a single string using BGE-small with an in-process cache."""
+    return list(_embed_cached(text))
 
 # ── Build or rebuild the index ───────────────────────────────────────────────
 def build_index(force: bool = False):
@@ -82,9 +88,15 @@ def get_table():
     """Return the LanceDB table, building index first if needed."""
     db_dir = Path(DB_PATH)
     if not db_dir.exists():
-        print("Index not found — building now...")
+        logger.info("Index not found — building now...")
         build_index()
+
     db = lancedb.connect(DB_PATH)
+    if TABLE_NAME not in db.table_names():
+        logger.warning("LanceDB table missing — rebuilding index.")
+        build_index(force=True)
+        db = lancedb.connect(DB_PATH)
+
     return db.open_table(TABLE_NAME)
 
 def retrieve(
@@ -101,46 +113,47 @@ def retrieve(
     """
     table = get_table()
 
-    # Embed the query
-    query_vector = embed(query)
+    # Embed the query with task+model context
+    query_vector = embed(f"{task_type} {target_model} {query}")
 
-    # Build metadata filter
-    # Try model-specific first
+    exact_filter = (
+        f"target_model = '{target_model}' "
+        f"AND task_type = '{task_type}' "
+        f"AND quality_score >= {min_quality}"
+    )
     model_filter = (
         f"target_model = '{target_model}' "
         f"AND quality_score >= {min_quality}"
     )
+    general_filter = f"quality_score >= {min_quality}"
 
-    try:
-        results = (
-            table.search(query_vector)
-                 .where(model_filter)
-                 .limit(top_k)
-                 .to_list()
-        )
-    except Exception:
-        results = []
-
-    # Fallback — if not enough results, widen to general
-    if len(results) < top_k:
-        general_filter = f"quality_score >= {min_quality}"
+    results = []
+    for metadata_filter in (exact_filter, model_filter, general_filter):
+        if len(results) >= top_k:
+            break
         try:
-            fallback = (
+            candidates = (
                 table.search(query_vector)
-                     .where(general_filter)
+                     .where(metadata_filter)
                      .limit(top_k)
                      .to_list()
             )
-            # Merge, deduplicate by id
-            seen = {r["id"] for r in results}
-            for r in fallback:
-                if r["id"] not in seen:
-                    results.append(r)
-                    seen.add(r["id"])
-                    if len(results) >= top_k:
-                        break
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("LanceDB search failed for filter '%s': %s", metadata_filter, exc)
+            candidates = []
+
+        # Merge, deduplicate by id
+        seen = {r["id"] for r in results}
+        for r in candidates:
+            if r["id"] not in seen:
+                results.append(r)
+                seen.add(r["id"])
+                if len(results) >= top_k:
+                    break
+
+        # If exact or model-specific search returns enough, keep it
+        if len(results) >= top_k:
+            break
 
     # Clean up — remove vector from returned results (not needed downstream)
     for r in results:

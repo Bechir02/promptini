@@ -232,15 +232,14 @@ def build_system_prompt(
     exemplar_block = ""
     if exemplars:
         exemplar_block = (
-            "\n\nSTUDY these high-quality exemplars for this exact model "
-            "and task. Learn their structure, specificity, and tone "
-            "— do NOT copy them verbatim:\n"
+            "\n\nReview these high-quality exemplars for structure and tone. "
+            "Do NOT copy them verbatim.\n"
         )
-        for i, ex in enumerate(exemplars, 1):
+        for i, ex in enumerate(exemplars[:2], 1):
+            exemplar_text = ex.get('prompt', '').replace('\n', ' ').strip()[:240]
             exemplar_block += (
-                f"\n--- Exemplar {i} "
-                f"[{ex.get('target_model')} / {ex.get('task_type')}] ---\n"
-                f"{ex.get('prompt', '')[:500]}\n"
+                f"\n--- Exemplar {i} [{ex.get('target_model')} / {ex.get('task_type')}] ---\n"
+                f"{exemplar_text}\n"
             )
 
     return f"""You are a world-class prompt engineer. Your job is to transform messy, vague user prompts into precise, model-optimized, task-specific prompts that produce dramatically better results.
@@ -255,7 +254,7 @@ DEPTH: {depth}
 EXAMPLE of correct format for {target_model}:
 {fmt['example']}
 
-━━━ TASK-SPECIFIC REQUIREMENTS FOR {task_type.upper()} ━━━
+━━━ TASK-SPECIFIC REQUIREMENTS FOR {task_type.upper()} ─━━
 {task_guide}
 
 ━━━ DEPTH REQUIREMENT ━━━
@@ -277,9 +276,7 @@ EXAMPLE of correct format for {target_model}:
 - NO "Here is your prompt:" or any preamble whatsoever
 - NO explanation of what you changed
 - NO markdown code fences around the output
-- NO commentary after the prompt ends
-- First character of response = first character of prompt
-- Last character of response = last character of prompt"""
+- NO commentary after the prompt ends"""
 
 
 # ── Groq call ─────────────────────────────────────────────────────────────────
@@ -294,7 +291,7 @@ def call_groq(system_prompt: str, user_prompt: str) -> str:
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": user_prompt},
         ],
-        max_tokens  = 1500,
+        max_tokens  = 1000,
         temperature = 0.4,
     )
     return response.choices[0].message.content.strip()
@@ -312,9 +309,30 @@ def call_cerebras(system_prompt: str, user_prompt: str) -> str:
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": user_prompt},
         ],
-        max_tokens = 1500,
+        max_tokens = 1000,
     )
     return response.choices[0].message.content.strip()
+
+
+def validate_transformed_prompt(result: str, target_model: str) -> None:
+    normalized = result.lower().strip()
+    if not normalized:
+        raise ValueError("LLM returned an empty transformed prompt.")
+
+    if target_model == "claude-code":
+        required = ["<role>", "<task>", "<output_format>"]
+        missing = [tag for tag in required if tag not in normalized]
+        if missing:
+            raise ValueError(f"Claude-format response missing tags: {', '.join(missing)}")
+    elif target_model == "gpt-4":
+        if "## task" not in normalized or "## output" not in normalized:
+            raise ValueError("GPT-4 format response missing required headers.")
+    elif target_model == "gemini":
+        if "task:" not in normalized or "output:" not in normalized:
+            raise ValueError("Gemini format response missing required sections.")
+    elif target_model == "cursor":
+        if "<role>" in normalized or "## role" in normalized:
+            raise ValueError("Cursor format response should not use XML or markdown headers.")
 
 
 # ── Main transform function ───────────────────────────────────────────────────
@@ -340,12 +358,14 @@ def transform_prompt(
 
     try:
         result = call_groq(system_prompt, user_message)
+        validate_transformed_prompt(result, target_model)
         return result, "Groq (llama-3.3-70b)"
     except Exception as e:
         print(f"Groq failed: {e} — falling back to Cerebras...")
 
     try:
         result = call_cerebras(system_prompt, user_message)
+        validate_transformed_prompt(result, target_model)
         return result, "Cerebras (llama3.1-8b)"
     except Exception as e:
         raise RuntimeError(
