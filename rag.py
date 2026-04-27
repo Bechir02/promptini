@@ -3,10 +3,58 @@ from llm import transform_prompt
 
 def detect_task_type(raw_prompt: str) -> str:
     """
-    Simple keyword-based task type detector.
-    Used to improve retrieval when user hasn't specified task type.
+    Keyword-based task type detector.
+    Order matters — more specific checks run first.
     """
     prompt_lower = raw_prompt.lower()
+
+    # Extraction first — before code_generation to avoid false matches
+    if any(w in prompt_lower for w in [
+        "extract", "parse", "pull out", "get fields", "find all",
+        "pull", "grab", "fetch fields", "get the", "retrieve fields"
+    ]):
+        return "extraction"
+
+    if any(w in prompt_lower for w in [
+        "fix", "debug", "error", "bug", "issue", "broken",
+        "crash", "exception", "not working", "fails"
+    ]):
+        return "debugging"
+
+    if any(w in prompt_lower for w in [
+        "review", "check", "audit", "evaluate", "assess", "critique"
+    ]):
+        return "code_review"
+
+    if any(w in prompt_lower for w in [
+        "refactor", "clean", "improve", "optimize",
+        "restructure", "simplify"
+    ]):
+        return "refactoring"
+
+    if any(w in prompt_lower for w in [
+        "document", "docs", "docstring", "readme",
+        "comment", "explain"
+    ]):
+        return "documentation"
+
+    if any(w in prompt_lower for w in [
+        "analyze", "analysis", "compare", "research",
+        "investigate", "study"
+    ]):
+        return "analysis"
+
+    if any(w in prompt_lower for w in [
+        "summarize", "summary", "tldr", "brief",
+        "overview", "recap"
+    ]):
+        return "summarization"
+
+    if any(w in prompt_lower for w in [
+        "system prompt", "persona", "act as",
+        "you are", "role", "agent"
+    ]):
+        return "system_prompt"
 
     if any(w in prompt_lower for w in [
         "write", "create", "build", "implement", "generate", "code",
@@ -15,49 +63,10 @@ def detect_task_type(raw_prompt: str) -> str:
         return "code_generation"
 
     if any(w in prompt_lower for w in [
-        "review", "check", "audit", "evaluate", "assess", "critique"
-    ]):
-        return "code_review"
-
-    if any(w in prompt_lower for w in [
-        "fix", "debug", "error", "bug", "issue", "broken", "crash", "exception"
-    ]):
-        return "debugging"
-
-    if any(w in prompt_lower for w in [
-        "refactor", "clean", "improve", "optimize", "restructure", "simplify"
-    ]):
-        return "refactoring"
-
-    if any(w in prompt_lower for w in [
-        "document", "docs", "docstring", "readme", "comment", "explain"
-    ]):
-        return "documentation"
-
-    if any(w in prompt_lower for w in [
-        "analyze", "analysis", "compare", "research", "investigate", "study"
-    ]):
-        return "analysis"
-
-    if any(w in prompt_lower for w in [
-        "summarize", "summary", "tldr", "brief", "overview", "recap"
-    ]):
-        return "summarization"
-
-    if any(w in prompt_lower for w in [
-        "extract", "parse", "pull out", "get fields", "find all", "retrieve"
-    ]):
-        return "extraction"
-
-    if any(w in prompt_lower for w in [
-        "write", "story", "essay", "blog", "article", "creative", "poem"
+        "story", "essay", "blog", "article",
+        "creative", "poem", "write"
     ]):
         return "writing"
-
-    if any(w in prompt_lower for w in [
-        "system prompt", "persona", "act as", "you are", "role", "agent"
-    ]):
-        return "system_prompt"
 
     return "general"
 
@@ -74,15 +83,6 @@ def run_pipeline(
     2. Retrieve relevant exemplars from LanceDB
     3. Transform prompt using LLM with exemplars as context
     4. Return result dict with all metadata
-
-    Returns:
-        {
-            "transformed": str,
-            "provider":    str,
-            "task_type":   str,
-            "exemplars":   list[dict],
-            "error":       str or None,
-        }
     """
 
     # Step 1 — detect task type
@@ -131,16 +131,11 @@ def run_pipeline(
 
 # ── Quick test ────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    result = run_pipeline(
-        raw_prompt   = "write me a python function that reads a csv and finds duplicates",
-        target_model = "claude-code",
-        depth        = "standard",
-    )
-
-    print("\n── Result ──────────────────────────────────────────")
-    print(f"Provider  : {result['provider']}")
-    print(f"Task type : {result['task_type']}")
-    print(f"Exemplars : {len(result['exemplars'])}")
-    print(f"Error     : {result['error']}")
-    print("\n── Transformed Prompt ──────────────────────────────")
-    print(result["transformed"])
+    tests = [
+        ("pull out the user id and email from this json", "general"),
+        ("fix the bug in my login function", "cursor"),
+        ("write a python csv duplicate finder", "claude-code"),
+    ]
+    for prompt, model in tests:
+        detected = detect_task_type(prompt)
+        print(f"'{prompt[:50]}' → {detected}")
