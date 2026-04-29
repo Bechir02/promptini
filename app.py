@@ -15,7 +15,17 @@ if not Path("lancedb_store").exists():
 else:
     print("Index found — skipping rebuild.")
 
-MODELS = ["claude-code", "gpt-4", "cursor", "gemini", "general"]
+MODELS = [
+    "claude-code",
+    "claude",
+    "gpt-4",
+    "cursor",
+    "gemini",
+    "llama",
+    "mistral",
+    "copilot",
+    "general",
+]
 DEPTHS = ["concise", "standard", "comprehensive"]
 
 # ── Core function ─────────────────────────────────────────────────────────────

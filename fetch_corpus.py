@@ -3,6 +3,7 @@ import json
 import time
 import requests
 from pathlib import Path
+from collections import Counter
 
 # ── Config ────────────────────────────────────────────────────────────────────
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
@@ -12,121 +13,397 @@ HEADERS      = {
     **({"Authorization": f"token {GITHUB_TOKEN}"} if GITHUB_TOKEN else {}),
 }
 
-# ── Repos to fetch ────────────────────────────────────────────────────────────
+# ── Repositories ──────────────────────────────────────────────────────────────
 REPOS = [
+
+    # ── Claude / Claude Code ──────────────────────────────────────────────────
     {
         "repo":         "Piebald-AI/claude-code-system-prompts",
         "target_model": "claude-code",
         "license":      "MIT",
-        "paths":        ["prompts", "tools", "subagents", "utility"],
         "extensions":   [".md", ".txt", ".json"],
     },
     {
         "repo":         "repowise-dev/claude-code-prompts",
         "target_model": "claude-code",
         "license":      "MIT",
-        "paths":        ["prompts", "patterns", "skills", "complete_prompts"],
         "extensions":   [".md", ".txt"],
     },
     {
-        "repo":         "DVC2/cursor_prompts",
-        "target_model": "cursor",
+        "repo":         "anthropics/prompt-eng-interactive-tutorial",
+        "target_model": "claude",
         "license":      "MIT",
-        "paths":        [".cursor/rules", "prompts", "examples"],
-        "extensions":   [".md", ".mdc", ".txt"],
+        "extensions":   [".md", ".txt", ".ipynb"],
+    },
+    {
+        "repo":         "langgptai/awesome-claude-prompts",
+        "target_model": "claude",
+        "license":      "MIT",
+        "extensions":   [".md", ".txt"],
+    },
+    {
+        "repo":         "langgptai/wonderful-prompts",
+        "target_model": "claude",
+        "license":      "MIT",
+        "extensions":   [".md", ".txt"],
+    },
+    {
+        "repo":         "oxbshw/System-Prompt-Agent-Prompts",
+        "target_model": "claude-code",
+        "license":      "MIT",
+        "extensions":   [".md", ".txt", ".json"],
+    },
+    {
+        "repo":         "Comfy-Org/comfy-claude-prompt-library",
+        "target_model": "claude",
+        "license":      "MIT",
+        "extensions":   [".md", ".txt", ".json"],
+    },
+    {
+        "repo":         "VoltAgent/awesome-claude-code-subagents",
+        "target_model": "claude-code",
+        "license":      "MIT",
+        "extensions":   [".md", ".txt"],
+    },
+
+    # ── GPT-4 / GPT-4o ───────────────────────────────────────────────────────
+    {
+        "repo":         "f/awesome-chatgpt-prompts",
+        "target_model": "gpt-4",
+        "license":      "CC0-1.0",
+        "extensions":   [".md", ".csv"],
     },
     {
         "repo":         "awesome-chatgpt-prompts/awesome-chatgpt-prompts-github",
         "target_model": "gpt-4",
         "license":      "CC0-1.0",
-        "paths":        [""],
-        "extensions":   [".csv", ".md"],
+        "extensions":   [".md", ".csv"],
     },
+    {
+        "repo":         "bharatkalluri/awesome-prompts",
+        "target_model": "gpt-4",
+        "license":      "MIT",
+        "extensions":   [".md", ".txt"],
+    },
+    {
+        "repo":         "brexhq/prompt-engineering",
+        "target_model": "gpt-4",
+        "license":      "MIT",
+        "extensions":   [".md", ".txt"],
+    },
+    {
+        "repo":         "microsoft/promptbase",
+        "target_model": "gpt-4",
+        "license":      "MIT",
+        "extensions":   [".md", ".txt", ".json"],
+    },
+    {
+        "repo":         "openai/openai-cookbook",
+        "target_model": "gpt-4",
+        "license":      "MIT",
+        "extensions":   [".md", ".txt", ".ipynb"],
+    },
+    {
+        "repo":         "mustvlad/ChatGPT-System-Prompts",
+        "target_model": "gpt-4",
+        "license":      "MIT",
+        "extensions":   [".md", ".txt", ".json"],
+    },
+    {
+        "repo":         "linexjlin/GPTs",
+        "target_model": "gpt-4",
+        "license":      "MIT",
+        "extensions":   [".md", ".txt"],
+    },
+    {
+        "repo":         "LouisShark/chatgpt_system_prompt",
+        "target_model": "gpt-4",
+        "license":      "MIT",
+        "extensions":   [".md", ".txt"],
+    },
+    {
+        "repo":         "mattnigh/ChatGPT-Free-Prompt-List",
+        "target_model": "gpt-4",
+        "license":      "MIT",
+        "extensions":   [".md", ".txt"],
+    },
+    {
+        "repo":         "PickleBoxer/play-with-chatgpt",
+        "target_model": "gpt-4",
+        "license":      "MIT",
+        "extensions":   [".md", ".txt"],
+    },
+
+    # ── Cursor ────────────────────────────────────────────────────────────────
+    {
+        "repo":         "DVC2/cursor_prompts",
+        "target_model": "cursor",
+        "license":      "MIT",
+        "extensions":   [".md", ".mdc", ".txt"],
+    },
+    {
+        "repo":         "instructa/ai-prompts",
+        "target_model": "cursor",
+        "license":      "MIT",
+        "extensions":   [".md", ".txt", ".mdc"],
+    },
+    {
+        "repo":         "PatrickJS/awesome-cursorrules",
+        "target_model": "cursor",
+        "license":      "CC0-1.0",
+        "extensions":   [".md", ".mdc", ".txt"],
+    },
+    {
+        "repo":         "pontusab/cursor.directory",
+        "target_model": "cursor",
+        "license":      "MIT",
+        "extensions":   [".md", ".mdc", ".ts", ".tsx"],
+    },
+
+    # ── Gemini ────────────────────────────────────────────────────────────────
     {
         "repo":         "YouMind-OpenLab/awesome-gemini-3-prompts",
         "target_model": "gemini",
         "license":      "CC BY 4.0",
-        "paths":        ["prompts", ""],
         "extensions":   [".md", ".txt", ".json"],
+    },
+    {
+        "repo":         "ZeroLu/awesome-gemini-ai",
+        "target_model": "gemini",
+        "license":      "MIT",
+        "extensions":   [".md", ".txt"],
+    },
+    {
+        "repo":         "langgptai/awesome-gemini-prompts",
+        "target_model": "gemini",
+        "license":      "CC0-1.0",
+        "extensions":   [".md", ".txt"],
+    },
+
+    # ── Llama ─────────────────────────────────────────────────────────────────
+    {
+        "repo":         "langgptai/awesome-llama-prompts",
+        "target_model": "llama",
+        "license":      "Apache-2.0",
+        "extensions":   [".md", ".txt"],
+    },
+
+    # ── Mistral ───────────────────────────────────────────────────────────────
+    {
+        "repo":         "samouraiworld/awesome-mistral",
+        "target_model": "mistral",
+        "license":      "CC0-1.0",
+        "extensions":   [".md", ".txt"],
+    },
+
+    # ── GitHub Copilot ────────────────────────────────────────────────────────
+    {
+        "repo":         "pnp/copilot-prompts",
+        "target_model": "copilot",
+        "license":      "MIT",
+        "extensions":   [".md", ".txt", ".json"],
+    },
+
+    # ── Agentic ───────────────────────────────────────────────────────────────
+    {
+        "repo":         "e2b-dev/awesome-ai-agents",
+        "target_model": "general",
+        "license":      "Apache-2.0",
+        "extensions":   [".md", ".txt"],
+    },
+    {
+        "repo":         "kyrolabs/awesome-agents",
+        "target_model": "general",
+        "license":      "MIT",
+        "extensions":   [".md", ".txt"],
+    },
+    {
+        "repo":         "e2b-dev/e2b-cookbook",
+        "target_model": "general",
+        "license":      "Apache-2.0",
+        "extensions":   [".md", ".txt", ".ipynb"],
+    },
+    {
+        "repo":         "microsoft/TypeChat",
+        "target_model": "gpt-4",
+        "license":      "MIT",
+        "extensions":   [".md", ".txt"],
+    },
+
+    # ── General Prompt Engineering ────────────────────────────────────────────
+    {
+        "repo":         "promptslab/Awesome-Prompt-Engineering",
+        "target_model": "general",
+        "license":      "Apache-2.0",
+        "extensions":   [".md", ".txt"],
+    },
+    {
+        "repo":         "dair-ai/Prompt-Engineering-Guide",
+        "target_model": "general",
+        "license":      "MIT",
+        "extensions":   [".md", ".txt"],
+    },
+    {
+        "repo":         "ai-boost/awesome-prompts",
+        "target_model": "general",
+        "license":      "MIT",
+        "extensions":   [".md", ".txt", ".json"],
+    },
+    {
+        "repo":         "NirPolak/promptify",
+        "target_model": "general",
+        "license":      "MIT",
+        "extensions":   [".md", ".txt"],
+    },
+
+    # ── Domain — Data Science ─────────────────────────────────────────────────
+    {
+        "repo":         "dataprofessor/prompt-engineering",
+        "target_model": "general",
+        "license":      "MIT",
+        "extensions":   [".md", ".txt", ".ipynb"],
+    },
+    {
+        "repo":         "microsoft/Data-Science-For-Beginners",
+        "target_model": "general",
+        "license":      "MIT",
+        "extensions":   [".md"],
+    },
+
+    # ── Domain — Security ─────────────────────────────────────────────────────
+    {
+        "repo":         "TakSec/chatgpt-prompts-bug-bounty",
+        "target_model": "general",
+        "license":      "MIT",
+        "extensions":   [".md", ".txt"],
     },
 ]
 
-# ── Keyword-based task type detector ─────────────────────────────────────────
+# ── Task type detection ───────────────────────────────────────────────────────
 def detect_task_type(text: str) -> str:
     t = text.lower()
-    if any(w in t for w in ["extract", "pull out", "parse json", "get fields"]):
+
+    if any(w in t for w in [
+        "extract", "pull out", "parse json", "get fields",
+        "retrieve fields", "grab the", "pull the fields",
+    ]):
         return "extraction"
-    if any(w in t for w in ["system prompt", "persona", "act as", "you are a"]):
+
+    if any(w in t for w in [
+        "system prompt", "persona", "act as", "you are a",
+        "build an agent", "make an agent", "create an agent",
+    ]):
         return "system_prompt"
-    if any(w in t for w in ["review", "audit", "check for bugs", "scan for"]):
+
+    if any(w in t for w in [
+        "review", "audit", "check for bugs", "scan for",
+        "look for issues", "evaluate the code",
+    ]) and not any(w in t for w in ["fix", "debug"]):
         return "code_review"
-    if any(w in t for w in ["fix", "debug", "error", "bug", "not working"]):
+
+    if any(w in t for w in [
+        "fix", "debug", "error", "bug", "not working",
+        "broken", "crash", "exception", "fails",
+    ]) and not any(w in t for w in ["review", "monitor", "agent"]):
         return "debugging"
-    if any(w in t for w in ["refactor", "clean up", "optimize", "restructure"]):
+
+    if any(w in t for w in [
+        "refactor", "clean up", "optimize", "restructure",
+        "simplify", "rewrite", "improve the code",
+    ]):
         return "refactoring"
-    if any(w in t for w in ["document", "docstring", "readme", "explain"]):
+
+    if any(w in t for w in [
+        "document", "docstring", "readme", "explain this code",
+        "add comments", "write docs",
+    ]):
         return "documentation"
-    if any(w in t for w in ["analyze", "analysis", "compare", "research"]):
+
+    if any(w in t for w in [
+        "analyze", "analysis", "compare", "research",
+        "investigate", "examine", "study",
+    ]):
         return "analysis"
-    if any(w in t for w in ["summarize", "summary", "tldr", "overview"]):
+
+    if any(w in t for w in [
+        "summarize", "summary", "tldr", "overview",
+        "condense", "recap",
+    ]):
         return "summarization"
-    if any(w in t for w in ["story", "essay", "blog", "creative", "poem"]):
+
+    if any(w in t for w in [
+        "story", "essay", "blog post", "article",
+        "creative", "poem", "write about",
+    ]):
         return "writing"
-    if any(w in t for w in ["write", "create", "build", "implement",
-                             "function", "class", "script"]):
+
+    if any(w in t for w in [
+        "write", "create", "build", "implement",
+        "generate", "code", "function", "class",
+        "script", "program", "develop",
+    ]):
         return "code_generation"
+
     return "general"
 
 
-# ── Quality filter ────────────────────────────────────────────────────────────
+# ── Quality scoring ───────────────────────────────────────────────────────────
 def quality_score(text: str) -> float:
-    """
-    Simple heuristic quality scorer.
-    Returns a score between 0-10.
-    Filters out jailbreaks, very short prompts, and generic fluff.
-    """
-    score = 5.0
-    t     = text.lower()
-
-    # Too short — useless
     if len(text) < 50:
         return 0.0
 
-    # Jailbreak / DAN patterns — discard
+    t = text.lower()
+
     bad_patterns = [
         "dan ", "jailbreak", "ignore previous instructions",
-        "ignore all instructions", "you are now", "pretend you are",
-        "act as if you have no", "disregard", "bypass"
+        "ignore all instructions", "disregard all",
+        "bypass", "pretend you have no",
+        "act as if you have no restrictions",
+        "you are now", "unlock mode",
+        "developer mode", "no restrictions",
     ]
     if any(p in t for p in bad_patterns):
         return 0.0
 
-    # Positive signals
-    if any(w in t for w in ["<role>", "<task>", "<context>", "<constraints>"]):
+    score = 5.0
+
+    # Structure signals
+    if any(w in t for w in ["<role>", "<task>", "<context>", "<constraints>", "<output_format>"]):
         score += 2.0
-    if any(w in t for w in ["output format", "output_format", "format:"]):
+    if any(w in t for w in ["## role", "## task", "## context", "## output"]):
+        score += 1.5
+    if any(w in t for w in ["output format", "output_format", "format:", "return format"]):
         score += 1.0
-    if any(w in t for w in ["example", "e.g.", "for instance"]):
+    if any(w in t for w in ["example", "e.g.", "for instance", "sample"]):
         score += 0.5
     if any(w in t for w in ["step by step", "step-by-step", "first", "then", "finally"]):
         score += 0.5
+    if any(w in t for w in ["constraint", "rule:", "must not", "do not", "never"]):
+        score += 0.5
+    if any(w in t for w in ["verify", "confirm", "test", "validate"]):
+        score += 0.5
+
+    # Length signals
     if len(text) > 300:
         score += 1.0
     if len(text) > 600:
         score += 0.5
+    if len(text) > 1000:
+        score += 0.3
 
     # Negative signals
     if text.count("\n") < 2:
         score -= 1.0
-    if any(w in t for w in ["lol", "haha", "omg", "wtf"]):
+    if any(w in t for w in ["lol", "haha", "omg", "wtf", "idk"]):
         score -= 2.0
+    if len(text) < 100:
+        score -= 1.0
 
     return min(max(score, 0.0), 10.0)
 
 
 # ── GitHub API helpers ────────────────────────────────────────────────────────
 def get_repo_tree(repo: str) -> list:
-    """Get full file tree for a repo."""
     url      = f"https://api.github.com/repos/{repo}/git/trees/HEAD?recursive=1"
     response = requests.get(url, headers=HEADERS)
     if response.status_code == 200:
@@ -136,65 +413,113 @@ def get_repo_tree(repo: str) -> list:
 
 
 def get_file_content(repo: str, path: str) -> str:
-    """Fetch raw file content from GitHub."""
-    url      = f"https://raw.githubusercontent.com/{repo}/main/{path}"
-    response = requests.get(url, headers=HEADERS)
-    if response.status_code != 200:
-        # Try master branch
-        url      = f"https://raw.githubusercontent.com/{repo}/master/{path}"
+    for branch in ["main", "master"]:
+        url      = f"https://raw.githubusercontent.com/{repo}/{branch}/{path}"
         response = requests.get(url, headers=HEADERS)
-    if response.status_code == 200:
-        return response.text
+        if response.status_code == 200:
+            return response.text
     return ""
 
 
-def parse_csv_prompts(content: str, target_model: str, license: str) -> list:
-    """Parse awesome-chatgpt-prompts style CSV."""
+# ── Parsers ───────────────────────────────────────────────────────────────────
+def parse_csv_prompts(
+    content: str, target_model: str,
+    license: str, repo: str,
+) -> list:
     prompts = []
     lines   = content.strip().split("\n")
-    for i, line in enumerate(lines[1:], 1):  # skip header
+    for i, line in enumerate(lines[1:], 1):
         parts = line.split('","')
         if len(parts) >= 2:
-            act    = parts[0].replace('"', '').strip()
-            prompt = parts[1].replace('"', '').strip()
+            act    = parts[0].strip('" ')
+            prompt = parts[1].strip('" ')
             if prompt and len(prompt) > 50:
                 score = quality_score(prompt)
                 if score >= 5.0:
                     prompts.append({
-                        "id":           f"{target_model}_csv_{i:04d}",
-                        "target_model": target_model,
-                        "task_type":    detect_task_type(prompt),
-                        "prompt":       prompt,
-                        "source_repo":  "awesome-chatgpt-prompts",
-                        "license":      license,
+                        "id":            f"{target_model}_csv_{i:04d}",
+                        "target_model":  target_model,
+                        "task_type":     detect_task_type(prompt),
+                        "prompt":        prompt,
+                        "source_repo":   repo,
+                        "license":       license,
                         "quality_score": round(score, 1),
-                        "act":          act,
+                        "act":           act,
                     })
     return prompts
 
 
-def parse_markdown_prompts(
-    content:      str,
-    target_model: str,
-    license:      str,
-    source_repo:  str,
-    file_path:    str,
-    idx:          int,
+def parse_ipynb_prompts(
+    content: str, target_model: str,
+    license: str, repo: str, idx: int,
 ) -> list:
-    """
-    Parse markdown files — extract code blocks and substantial paragraphs
-    as prompt candidates.
-    """
+    prompts = []
+    try:
+        nb    = json.loads(content)
+        cells = nb.get("cells", [])
+        for j, cell in enumerate(cells):
+            if cell.get("cell_type") in ["markdown", "code"]:
+                src = "".join(cell.get("source", []))
+                if len(src) > 100:
+                    score = quality_score(src)
+                    if score >= 6.0:
+                        prompts.append({
+                            "id":            f"{target_model}_nb_{idx:03d}_{j:02d}",
+                            "target_model":  target_model,
+                            "task_type":     detect_task_type(src),
+                            "prompt":        src[:1000],
+                            "source_repo":   repo,
+                            "license":       license,
+                            "quality_score": round(score, 1),
+                        })
+    except Exception:
+        pass
+    return prompts
+
+
+def parse_json_prompts(
+    content: str, target_model: str,
+    license: str, repo: str,
+    file_idx: int,
+) -> list:
+    prompts = []
+    try:
+        data = json.loads(content)
+        items = data if isinstance(data, list) else []
+        for j, item in enumerate(items):
+            text = item.get("prompt", item.get("content", item.get("text", "")))
+            if text and len(text) > 50:
+                score = quality_score(text)
+                if score >= 6.0:
+                    prompts.append({
+                        "id":            f"{target_model}_json_{file_idx:03d}_{j:02d}",
+                        "target_model":  target_model,
+                        "task_type":     detect_task_type(text),
+                        "prompt":        text[:1000],
+                        "source_repo":   repo,
+                        "license":       license,
+                        "quality_score": round(score, 1),
+                    })
+    except Exception:
+        pass
+    return prompts
+
+
+def parse_markdown_prompts(
+    content: str, target_model: str, license: str,
+    source_repo: str, file_path: str, idx: int,
+) -> list:
+    import re
     prompts = []
     blocks  = []
 
-    # Extract fenced code blocks
-    import re
     code_blocks = re.findall(r"```(?:[\w]*)\n([\s\S]*?)```", content)
     blocks.extend(code_blocks)
 
-    # Extract paragraphs longer than 100 chars
-    paragraphs = [p.strip() for p in content.split("\n\n") if len(p.strip()) > 100]
+    paragraphs = [
+        p.strip() for p in content.split("\n\n")
+        if len(p.strip()) > 100
+    ]
     blocks.extend(paragraphs)
 
     for j, block in enumerate(blocks):
@@ -203,19 +528,19 @@ def parse_markdown_prompts(
         if score >= 6.0:
             slug = Path(file_path).stem[:20].replace(" ", "_")
             prompts.append({
-                "id":           f"{target_model}_{slug}_{idx:03d}_{j:02d}",
-                "target_model": target_model,
-                "task_type":    detect_task_type(block),
-                "prompt":       block,
-                "source_repo":  source_repo,
-                "license":      license,
+                "id":            f"{target_model}_{slug}_{idx:03d}_{j:02d}",
+                "target_model":  target_model,
+                "task_type":     detect_task_type(block),
+                "prompt":        block[:1000],
+                "source_repo":   source_repo,
+                "license":       license,
                 "quality_score": round(score, 1),
             })
 
     return prompts
 
 
-# ── Main fetch function ───────────────────────────────────────────────────────
+# ── Main fetch ────────────────────────────────────────────────────────────────
 def fetch_all_prompts() -> list:
     all_prompts = []
 
@@ -225,121 +550,85 @@ def fetch_all_prompts() -> list:
         license      = repo_config["license"]
         extensions   = repo_config["extensions"]
 
-        print(f"\n📦 Fetching: {repo}")
+        print(f"\n📦 {repo}")
         tree = get_repo_tree(repo)
 
         if not tree:
-            print(f"  Skipping — could not fetch tree.")
+            print(f"  Skipping.")
             continue
 
-        # Filter files by extension
         files = [
             item["path"] for item in tree
             if item["type"] == "blob"
             and any(item["path"].endswith(ext) for ext in extensions)
         ]
 
-        print(f"  Found {len(files)} files to process.")
+        print(f"  {len(files)} files found.")
+        repo_count = 0
 
         for i, file_path in enumerate(files):
-            print(f"  [{i+1}/{len(files)}] {file_path}")
             content = get_file_content(repo, file_path)
-
             if not content:
                 continue
 
-            # CSV files (awesome-chatgpt-prompts style)
             if file_path.endswith(".csv"):
-                parsed = parse_csv_prompts(content, target_model, license)
-                all_prompts.extend(parsed)
-                print(f"    → {len(parsed)} prompts from CSV")
-
-            # JSON files
+                parsed = parse_csv_prompts(
+                    content, target_model, license, repo)
+            elif file_path.endswith(".ipynb"):
+                parsed = parse_ipynb_prompts(
+                    content, target_model, license, repo, i)
             elif file_path.endswith(".json"):
-                try:
-                    data = json.loads(content)
-                    if isinstance(data, list):
-                        for j, item in enumerate(data):
-                            text = item.get("prompt", item.get("content", ""))
-                            if text:
-                                score = quality_score(text)
-                                if score >= 6.0:
-                                    all_prompts.append({
-                                        "id":           f"{target_model}_json_{i:03d}_{j:02d}",
-                                        "target_model": target_model,
-                                        "task_type":    detect_task_type(text),
-                                        "prompt":       text,
-                                        "source_repo":  repo,
-                                        "license":      license,
-                                        "quality_score": round(score, 1),
-                                    })
-                except json.JSONDecodeError:
-                    pass
-
-            # Markdown / text / mdc files
+                parsed = parse_json_prompts(
+                    content, target_model, license, repo, i)
             else:
                 parsed = parse_markdown_prompts(
-                    content, target_model, license, repo, file_path, i
-                )
-                all_prompts.extend(parsed)
-                if parsed:
-                    print(f"    → {len(parsed)} prompts extracted")
+                    content, target_model, license, repo, file_path, i)
 
-            # Rate limit protection
-            time.sleep(0.3)
+            all_prompts.extend(parsed)
+            repo_count += len(parsed)
+            time.sleep(0.25)
+
+        print(f"  → {repo_count} prompts")
 
     return all_prompts
 
 
-# ── Merge with existing seed prompts ─────────────────────────────────────────
-def merge_with_seed(fetched: list, seed_file: str = "prompts.json") -> list:
-    """Keep existing hand-crafted seed prompts and add fetched ones."""
-    try:
-        with open(seed_file, "r") as f:
-            seed = json.load(f)
-        print(f"\nLoaded {len(seed)} seed prompts from {seed_file}.")
-    except Exception:
-        seed = []
-
-    # Deduplicate by prompt text (first 200 chars)
-    seen     = {p["prompt"][:200] for p in seed}
-    new_only = []
-    for p in fetched:
-        key = p["prompt"][:200]
+# ── Deduplicate ───────────────────────────────────────────────────────────────
+def deduplicate(prompts: list) -> list:
+    seen   = set()
+    unique = []
+    for p in prompts:
+        key = p["prompt"][:200].strip().lower()
         if key not in seen:
-            new_only.append(p)
+            unique.append(p)
             seen.add(key)
-
-    merged = seed + new_only
-    print(f"Merged: {len(seed)} seed + {len(new_only)} new = {len(merged)} total prompts.")
-    return merged
+    return unique
 
 
 # ── Run ───────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     print("🔍 Starting corpus fetch...")
-    print(f"GitHub token: {'✅ set' if GITHUB_TOKEN else '⚠️  not set — rate limited to 60 req/hour'}")
+    print(f"Token: {'✅ set' if GITHUB_TOKEN else '⚠️  not set'}")
+    print(f"Repos: {len(REPOS)}")
 
     fetched = fetch_all_prompts()
     print(f"\n✅ Fetched {len(fetched)} raw prompts.")
 
-    merged = merge_with_seed(fetched)
+    unique = deduplicate(fetched)
+    print(f"✅ After dedup: {len(unique)} unique prompts.")
 
-    # Save
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        json.dump(merged, f, indent=2, ensure_ascii=False)
+        json.dump(unique, f, indent=2, ensure_ascii=False)
 
-    print(f"\n💾 Saved {len(merged)} prompts to {OUTPUT_FILE}")
+    print(f"💾 Saved to {OUTPUT_FILE}")
 
-    # Stats
-    from collections import Counter
-    models = Counter(p["target_model"] for p in merged)
-    tasks  = Counter(p["task_type"]    for p in merged)
+    models = Counter(p["target_model"] for p in unique)
+    tasks  = Counter(p["task_type"]    for p in unique)
 
-    print("\n── By model ─────────────────────────────")
+    print("\n── By model ─────────────────────────────────")
     for model, count in models.most_common():
         print(f"  {model:20s} {count}")
 
-    print("\n── By task type ─────────────────────────")
+    print("\n── By task type ─────────────────────────────")
     for task, count in tasks.most_common():
         print(f"  {task:20s} {count}")

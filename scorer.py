@@ -1,6 +1,6 @@
 import re
 
-# ── Vague words that weaken prompts ──────────────────────────────────────────
+# ── Vague words ───────────────────────────────────────────────────────────────
 VAGUE_WORDS = [
     "good", "nice", "appropriate", "proper", "relevant",
     "if possible", "as needed", "when applicable",
@@ -12,13 +12,17 @@ VAGUE_WORDS = [
 # ── Required sections per model ───────────────────────────────────────────────
 REQUIRED_SECTIONS = {
     "claude-code": ["<role>", "<task>", "<constraints>", "<output_format>"],
+    "claude":      ["<role>", "<task>", "<constraints>"],
     "gpt-4":       ["## role", "## task", "## output"],
     "cursor":      [],
     "gemini":      ["task:", "output:"],
+    "llama":       ["role:", "task:", "output:"],
+    "mistral":     ["## role", "## task"],
+    "copilot":     ["language:", "file"],
     "general":     ["role", "task", "output"],
 }
 
-# ── Required elements per task type ──────────────────────────────────────────
+# ── Task requirements ─────────────────────────────────────────────────────────
 TASK_REQUIREMENTS = {
     "code_generation": ["input", "output", "error", "return"],
     "debugging":       ["error", "root cause", "fix", "prevent"],
@@ -40,6 +44,11 @@ MODEL_CHECKS = {
         "bad":  ["## role", "## task", "## output"],
         "note": "Should use XML tags — <role>, <task>, <constraints>, <output_format>.",
     },
+    "claude": {
+        "good": ["<role>", "<task>", "<constraints>"],
+        "bad":  ["## role", "## task"],
+        "note": "Should use XML tags like claude-code.",
+    },
     "gpt-4": {
         "good": ["##", "## role", "## task"],
         "bad":  ["<role>", "<task>", "<constraints>"],
@@ -48,12 +57,27 @@ MODEL_CHECKS = {
     "cursor": {
         "good": ["you are working inside cursor", "verify", "inside cursor"],
         "bad":  ["<role>", "<task>", "## role", "## task"],
-        "note": "Should be minimal and action-oriented with no XML or markdown headers.",
+        "note": "Should be minimal and action-oriented.",
     },
     "gemini": {
         "good": ["task:", "steps:", "output:", "step 1", "1."],
         "bad":  ["<role>", "<task>"],
-        "note": "Should use numbered steps format with Task/Output sections.",
+        "note": "Should use numbered steps format.",
+    },
+    "llama": {
+        "good": ["role:", "task:", "steps:", "constraints:", "output:"],
+        "bad":  ["<role>", "<task>"],
+        "note": "Should use clear labeled sections with numbered steps.",
+    },
+    "mistral": {
+        "good": ["##", "## role", "## task", "## requirements"],
+        "bad":  ["<role>", "<task>"],
+        "note": "Should use markdown headers.",
+    },
+    "copilot": {
+        "good": ["language:", "file", "function", "implement"],
+        "bad":  ["<role>", "## role"],
+        "note": "Should be code-focused and file-aware.",
     },
     "general": {
         "good": ["**role**", "**task**", "**output**", "role:", "task:"],
@@ -64,14 +88,13 @@ MODEL_CHECKS = {
 
 
 def score_structure(output: str, target_model: str) -> dict:
-    """Check if required sections are present for the target model."""
     required = REQUIRED_SECTIONS.get(target_model, [])
     if not required:
         return {
-            "score": 10.0,
-            "found": [],
+            "score":   10.0,
+            "found":   [],
             "missing": [],
-            "note": "No strict structure requirements for this model.",
+            "note":    "No strict structure requirements for this model.",
         }
 
     output_lower = output.lower()
@@ -88,7 +111,6 @@ def score_structure(output: str, target_model: str) -> dict:
 
 
 def score_specificity(raw: str, output: str) -> dict:
-    """Penalize vague words, reward concrete language, and preserve placeholders."""
     output_lower = output.lower()
     found_vague  = [w for w in VAGUE_WORDS if w in output_lower]
 
@@ -109,15 +131,14 @@ def score_specificity(raw: str, output: str) -> dict:
     )
     score = min(score + bonuses * 0.4, 10.0)
 
-    placeholders = re.findall(r"\{[\w_-]+\}", raw)
+    placeholders         = re.findall(r"\{[\w_-]+\}", raw)
     missing_placeholders = [p for p in placeholders if p not in output]
     if missing_placeholders:
-        deduction += min(len(missing_placeholders) * 2.0, 6.0)
-        score = max(10.0 - deduction, 0.0)
+        score = max(score - len(missing_placeholders) * 2.0, 0.0)
 
     note = []
     if found_vague:
-        note.append(f"Found {len(found_vague)} vague words")
+        note.append(f"{len(found_vague)} vague words found")
     if missing_placeholders:
         note.append(f"missing placeholders: {', '.join(missing_placeholders)}")
     if not note:
@@ -131,7 +152,6 @@ def score_specificity(raw: str, output: str) -> dict:
 
 
 def score_model_awareness(output: str, target_model: str) -> dict:
-    """Check if output uses correct format for the target model."""
     output_lower = output.lower()
     check        = MODEL_CHECKS.get(target_model, MODEL_CHECKS["general"])
 
@@ -148,7 +168,6 @@ def score_model_awareness(output: str, target_model: str) -> dict:
 
 
 def score_task_coverage(output: str, task_type: str) -> dict:
-    """Check if task-specific required elements are present."""
     required = TASK_REQUIREMENTS.get(task_type, [])
     if not required:
         return {
@@ -172,7 +191,6 @@ def score_task_coverage(output: str, task_type: str) -> dict:
 
 
 def score_improvement(raw: str, output: str) -> dict:
-    """Check if output is meaningfully better than input."""
     raw_words    = len(raw.split())
     output_words = len(output.split())
     ratio        = output_words / max(raw_words, 1)
@@ -185,13 +203,13 @@ def score_improvement(raw: str, output: str) -> dict:
         note  = "Small improvement over input."
     elif ratio <= 3.5:
         score = 9.0
-        note  = f"Good expansion — {ratio:.1f}x longer than input. ✓"
+        note  = f"Good expansion — {ratio:.1f}x longer. ✓"
     elif ratio <= 5.0:
         score = 8.0
-        note  = f"Very detailed output — review for conciseness."
+        note  = "Very detailed — review for conciseness."
     else:
         score = 6.0
-        note  = f"Very long ({ratio:.1f}x) — may have unnecessary padding."
+        note  = f"Very long ({ratio:.1f}x) — may have padding."
 
     return {
         "score":        round(score, 1),
@@ -202,17 +220,12 @@ def score_improvement(raw: str, output: str) -> dict:
     }
 
 
-# ── Master scorer ─────────────────────────────────────────────────────────────
 def score_transformation(
     raw_prompt:   str,
     output:       str,
     target_model: str,
     task_type:    str,
 ) -> dict:
-    """
-    Score a prompt transformation across 5 dimensions.
-    Returns overall score out of 10 with full breakdown.
-    """
     structure   = score_structure(output, target_model)
     specificity = score_specificity(raw_prompt, output)
     model_aware = score_model_awareness(output, target_model)
@@ -260,10 +273,8 @@ def score_transformation(
 
 
 def format_score_for_ui(score_result: dict) -> str:
-    """Format score result as readable string for Gradio UI."""
     s = score_result
     b = s["breakdown"]
-
     lines = [
         f"Overall: {s['overall']}/10  |  Grade: {s['grade']}",
         f"",
