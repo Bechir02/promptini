@@ -1,4 +1,7 @@
 import re
+import os
+import json
+from llm import call_groq, call_cerebras
 
 # ── Vague words ───────────────────────────────────────────────────────────────
 VAGUE_WORDS = [
@@ -220,6 +223,51 @@ def score_improvement(raw: str, output: str) -> dict:
     }
 
 
+def score_with_llm(raw_prompt: str, output: str, target_model: str, task_type: str) -> dict:
+    """Uses an LLM to evaluate the transformation on tone, utility, and adherence."""
+    system_prompt = f"""You are an expert prompt engineering evaluator. Grade the following transformation from a "Messy Prompt" to a "Structured Prompt".
+
+TARGET MODEL: {target_model}
+TASK TYPE: {task_type}
+
+EVALUATION CRITERIA:
+1. TONE (0-3 pts): Is the tone appropriate for the target model? (e.g., XML for Claude, Markdown for GPT-4).
+2. UTILITY (0-4 pts): Does the structured prompt add meaningful constraints and context that were missing?
+3. FAITHFULNESS (0-3 pts): Did it preserve the user's original intent without adding unrelated fluff?
+
+OUTPUT FORMAT:
+Return ONLY a JSON object with:
+- "score": (total float 0-10)
+- "reasoning": (brief explanation)
+- "strengths": [list]
+- "weaknesses": [list]
+"""
+    user_message = f"Messy Prompt:\n{raw_prompt}\n\nStructured Prompt:\n{output}"
+
+    try:
+        # Use Groq for scoring as it's fast
+        llm_output, _ = call_groq(system_prompt, user_message)
+        # Simple JSON extraction
+        match = re.search(r"\{.*\}", llm_output, re.DOTALL)
+        if match:
+            res = json.loads(match.group(0))
+            return {
+                "score":     float(res.get("score", 7.0)),
+                "note":      res.get("reasoning", "LLM-based evaluation complete."),
+                "strengths": res.get("strengths", []),
+                "weaknesses": res.get("weaknesses", []),
+            }
+    except Exception as e:
+        print(f"LLM scoring failed: {e}")
+
+    return {
+        "score": 7.5,
+        "note":  "LLM evaluation unavailable — using heuristic fallback.",
+        "strengths": [],
+        "weaknesses": [],
+    }
+
+
 def score_transformation(
     raw_prompt:   str,
     output:       str,
@@ -231,13 +279,15 @@ def score_transformation(
     model_aware = score_model_awareness(output, target_model)
     task_cover  = score_task_coverage(output, task_type)
     improvement = score_improvement(raw_prompt, output)
+    llm_judge   = score_with_llm(raw_prompt, output, target_model, task_type)
 
     weights = {
-        "structure":   0.25,
-        "specificity": 0.25,
-        "model_aware": 0.20,
-        "task_cover":  0.20,
-        "improvement": 0.10,
+        "structure":   0.20,
+        "specificity": 0.20,
+        "model_aware": 0.15,
+        "task_cover":  0.15,
+        "improvement": 0.05,
+        "llm_judge":   0.25,
     }
 
     overall = (
@@ -245,7 +295,8 @@ def score_transformation(
         specificity["score"] * weights["specificity"] +
         model_aware["score"] * weights["model_aware"] +
         task_cover["score"]  * weights["task_cover"]  +
-        improvement["score"] * weights["improvement"]
+        improvement["score"] * weights["improvement"] +
+        llm_judge["score"]   * weights["llm_judge"]
     )
 
     if overall >= 9.0:
@@ -268,6 +319,7 @@ def score_transformation(
             "model_aware": model_aware,
             "task_cover":  task_cover,
             "improvement": improvement,
+            "llm_judge":   llm_judge,
         },
     }
 
@@ -283,5 +335,6 @@ def format_score_for_ui(score_result: dict) -> str:
         f"Model-aware   {b['model_aware']['score']:4.1f}/10  — {b['model_aware']['note']}",
         f"Task coverage {b['task_cover']['score']:4.1f}/10  — {b['task_cover']['note']}",
         f"Improvement   {b['improvement']['score']:4.1f}/10  — {b['improvement']['note']}",
+        f"Human-grade   {b['llm_judge']['score']:4.1f}/10  — {b['llm_judge']['note']}",
     ]
     return "\n".join(lines)

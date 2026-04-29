@@ -79,11 +79,20 @@ def forge(raw_prompt: str, target_model: str, depth: str):
         f"score: {score_result['overall']}/10"
     )
 
+    reasoning_text = f"REASONING:\n{score_result['breakdown']['llm_judge']['note']}\n\n"
+    if score_result['breakdown']['llm_judge']['strengths']:
+        reasoning_text += "STRENGTHS:\n- " + "\n- ".join(score_result['breakdown']['llm_judge']['strengths']) + "\n\n"
+    if score_result['breakdown']['llm_judge']['weaknesses']:
+        reasoning_text += "WEAKNESSES:\n- " + "\n- ".join(score_result['breakdown']['llm_judge']['weaknesses'])
+    
+    score_display_text = format_score_for_ui(score_result)
+    full_score_text = f"{score_display_text}\n\n{reasoning_text}"
+
     return (
         result["transformed"],
         status,
         exemplar_text,
-        score_text,
+        full_score_text,
         meta,
     )
 
@@ -199,7 +208,7 @@ textarea::placeholder { color: #bbb7af !important; }
 }
 
 /* Dropdowns */
-.gr-dropdown, select, .wrap.svelte-w6rprc {
+.gr-dropdown {
     background: #f7f7f5 !important;
     border: 0.5px solid #ebebea !important;
     border-radius: 20px !important;
@@ -287,7 +296,7 @@ with gr.Blocks(title="Prompt Forge", css=CSS) as demo:
     # Header
     gr.Markdown("""
 <div class="pf-header">
-<div style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:500;color:#c4633e;background:white;border:0.5px solid #f0d0c0;padding:5px 14px;border-radius:20px;margin-bottom:18px;">⚡ RAG · 2,158 prompts</div>
+<div style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:500;color:#c4633e;background:white;border:0.5px solid #f0d0c0;padding:5px 14px;border-radius:20px;margin-bottom:18px;">⚡ RAG · 8,435 prompts</div>
 <h1 style="font-size:32px;font-weight:600;color:#1c1c1a;letter-spacing:-0.04em;line-height:1.18;margin-bottom:12px;font-family:'DM Sans',sans-serif;">Turn messy prompts into <span style="color:#c4633e;">model-ready instructions</span></h1>
 <p style="font-size:14px;color:#999;line-height:1.65;max-width:460px;margin:0 auto;font-family:'DM Sans',sans-serif;">RAG-powered prompt rewriting for Claude Code, GPT-4, Cursor, Gemini, and general use.</p>
 </div>
@@ -368,11 +377,24 @@ with gr.Blocks(title="Prompt Forge", css=CSS) as demo:
 
         with gr.Column(scale=1, elem_classes="bottom-card"):
             score_display = gr.Textbox(
-                label       = "Quality score",
-                lines       = 6,
+                label       = "Quality score & Reasoning",
+                lines       = 8,
                 interactive = False,
                 elem_classes= "score-text",
             )
+
+    # Event handlers
+    forge_btn.click(
+        fn=forge,
+        inputs=[raw_input, model_dropdown, depth_dropdown],
+        outputs=[output_display, status_display, exemplar_display, score_display, output_meta]
+    )
+
+    copy_btn.click(
+        fn=None,
+        inputs=output_display,
+        js="(v) => { navigator.clipboard.writeText(v); alert('Copied to clipboard!'); }"
+    )
 
 if __name__ == "__main__":
     demo.launch()

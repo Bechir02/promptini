@@ -79,7 +79,8 @@ def build_index(force: bool = False):
         db.drop_table(TABLE_NAME)
 
     table = db.create_table(TABLE_NAME, data=rows)
-    print(f"Created table '{TABLE_NAME}' with {len(rows)} rows.")
+    table.create_fts_index("prompt", replace=True)
+    print(f"Created table '{TABLE_NAME}' with {len(rows)} rows and FTS index.")
     print("Index build complete.")
     
 # ── Retrieve function (used by rag.py) ───────────────────────────────────────
@@ -130,18 +131,32 @@ def retrieve(
     for metadata_filter in (exact_filter, model_filter, general_filter):
         if len(results) >= top_k:
             break
+        
+        candidates = []
         try:
-            candidates = (
+            # 1. Vector search
+            v_hits = (
                 table.search(query_vector)
                      .where(metadata_filter)
                      .limit(top_k)
                      .to_list()
             )
+            candidates.extend(v_hits)
+            
+            # 2. FTS search (Keyword matching)
+            # We search for the raw query string
+            f_hits = (
+                table.search(query)
+                     .where(metadata_filter)
+                     .limit(top_k)
+                     .to_list()
+            )
+            candidates.extend(f_hits)
+            
         except Exception as exc:
             logger.warning("LanceDB search failed for filter '%s': %s", metadata_filter, exc)
-            candidates = []
 
-        # Merge, deduplicate by id
+        # Merge, deduplicate by id, prioritize vector hits slightly by order
         seen = {r["id"] for r in results}
         for r in candidates:
             if r["id"] not in seen:
@@ -150,13 +165,14 @@ def retrieve(
                 if len(results) >= top_k:
                     break
 
-        # If exact or model-specific search returns enough, keep it
         if len(results) >= top_k:
             break
 
-    # Clean up — remove vector from returned results (not needed downstream)
+    # Clean up
     for r in results:
         r.pop("vector", None)
+        r.pop("_distance", None) # Remove search distance/score
+        r.pop("_score", None)
 
     return results[:top_k]
 

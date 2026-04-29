@@ -1,4 +1,6 @@
 import os
+from dotenv import load_dotenv
+load_dotenv()
 from groq import Groq
 from cerebras.cloud.sdk import Cerebras
 
@@ -206,11 +208,12 @@ TASK_GUIDANCE = {
 - Request actionable fixes, not just observations
 """,
     "refactoring": """
-- State the refactoring goal precisely
-- Explicitly require: preserve all existing behavior
-- Ask for before/after comparison
-- Limit scope — one concern at a time
-- Request explanation of each change made
+- State the refactoring goal precisely (e.g., reduce cognitive complexity, improve DRY, add type hints)
+- Explicitly require: preserve all existing behavior and pass all current tests
+- Ask for a "Before/After" comparison table or summary
+- Limit scope — focus on one architectural concern at a time
+- Request an explanation of EACH pattern applied (e.g., "Extracted Method", "Replaced Magic Number")
+- Require that no new dependencies be added unless specified
 """,
     "documentation": """
 - Specify doc format (docstring / JSDoc / README / inline)
@@ -234,11 +237,12 @@ TASK_GUIDANCE = {
 - Handle edge cases: nested fields, arrays, ambiguous values
 """,
     "summarization": """
-- Specify target length (word count or sentence count)
-- Define what must be preserved
-- Define what to exclude
-- Specify audience and reading level
-- Prohibit starting with "This document..."
+- Specify target length EXACTLY (e.g., "between 100 and 150 words" or "3-5 bullet points")
+- Define what "Key Information" must be preserved (e.g., names, dates, core argument)
+- Define what to exclude (e.g., examples, preamble, meta-commentary)
+- Specify the reading level (e.g., "Grade 10", "Executive Summary", "Layperson")
+- Prohibit generic openings like "This document discusses..." or "The text covers..."
+- Ask for a "TL;DR" one-liner at the very top
 """,
     "system_prompt": """
 - Define the persona with specific traits, not generic ones
@@ -248,11 +252,12 @@ TASK_GUIDANCE = {
 - Add an out-of-scope redirect behavior
 """,
     "writing": """
-- Specify genre, tone, and target audience explicitly
-- Define length in word count
-- List stylistic constraints
-- Prohibit meta-commentary — start writing immediately
-- Give one concrete example of the desired style
+- Specify genre, tone, and target audience with descriptive adjectives (e.g., "Professional yet witty", "Technical but accessible")
+- Define length in word count range
+- List stylistic constraints (e.g., "No passive voice", "Use short paragraphs", "Include a punchy headline")
+- Prohibit meta-commentary — do not talk about the writing, just WRITE
+- Give one concrete example of the desired style and one example of a style to avoid
+- Specify the perspective (1st person, 3rd person objective, etc.)
 """,
     "general": """
 - Make the task as specific as possible

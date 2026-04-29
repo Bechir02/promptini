@@ -47,7 +47,8 @@ def detect_task_type(raw_prompt: str) -> str:
 
     if any(w in prompt_lower for w in [
         "refactor", "clean up", "improve", "optimize",
-        "restructure", "simplify", "rewrite",
+        "restructure", "simplify", "rewrite", "dry",
+        "boilerplate", "modularize", "decouple",
     ]):
         return "refactoring"
 
@@ -65,13 +66,15 @@ def detect_task_type(raw_prompt: str) -> str:
 
     if any(w in prompt_lower for w in [
         "summarize", "summary", "tldr", "brief",
-        "overview", "recap", "condense",
+        "overview", "recap", "condense", "main points",
+        "key takeaways", "gist", "abstract",
     ]):
         return "summarization"
 
     if any(w in prompt_lower for w in [
         "story", "essay", "blog post", "article",
-        "creative", "poem", "write about",
+        "creative", "poem", "write about", "draft a",
+        "composing", "narrative", "script a",
     ]):
         return "writing"
 
