@@ -366,11 +366,12 @@ with gr.Blocks(title="Prompt Forge Arena", css=CSS) as demo:
     def get_save_js(index):
         return f"""
         (prompt, model, status) => {{
+            const targetModel = Array.isArray(model) ? model[0] : model;
             window.parent.postMessage({{
                 type: 'savePrompt',
                 entry: {{
                     prompt: prompt,
-                    model: model[0] || model,
+                    model: targetModel,
                     status: status
                 }}
             }}, '*');
