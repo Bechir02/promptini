@@ -360,8 +360,8 @@ with gr.Blocks(title="Prompt Forge Arena", css=CSS) as demo:
     
     battle_note.change(lambda x: gr.update(visible=bool(x)), inputs=battle_note, outputs=arena_note_row)
 
-    copy_btn_1.click(fn=None, inputs=output_1, js="(v) => { navigator.clipboard.writeText(v); alert('Copied Version A!'); }")
-    copy_btn_2.click(fn=None, inputs=output_2, js="(v) => { navigator.clipboard.writeText(v); alert('Copied Version B!'); }")
+    copy_btn_1.click(fn=None, inputs=output_1, js="(v) => { window.parent.postMessage({ type: 'copyText', text: v }, '*'); }")
+    copy_btn_2.click(fn=None, inputs=output_2, js="(v) => { window.parent.postMessage({ type: 'copyText', text: v }, '*'); }")
 
     def get_save_js(index):
         return f"""
