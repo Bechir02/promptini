@@ -60,7 +60,7 @@ def build_index(force: bool = False):
     ]
 
     # Batch embed all at once — much faster than one by one
-    vectors = embedder.encode(
+    vectors = get_model().encode(
         texts,
         normalize_embeddings = True,
         batch_size           = 64,
