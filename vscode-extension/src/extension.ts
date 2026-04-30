@@ -64,7 +64,12 @@ function waitForServer(port: number, timeoutMs: number): Promise<void> {
   });
 }
 
-function getWebviewHtml(port: number): string {
+function getWebviewHtml(url: string, mode: string): string {
+  const banner = mode === "local" 
+    ? `<div class="banner">Local Server Running. Port: ${new URL(url).port}</div>`
+    : "";
+  const containerTop = mode === "local" ? "42px" : "0";
+
   return `<!DOCTYPE html>
 <html lang="en">
   <head>
@@ -78,7 +83,7 @@ function getWebviewHtml(port: number): string {
         width: 100%;
         height: 100%;
         overflow: hidden;
-        background: #f8fafc;
+        background: white;
       }
       iframe {
         border: none;
@@ -90,16 +95,18 @@ function getWebviewHtml(port: number): string {
         top: 0;
         left: 0;
         right: 0;
-        padding: 12px 16px;
-        background: rgba(15, 23, 42, 0.92);
+        padding: 10px 16px;
+        background: #c4633e;
         color: white;
-        font-family: sans-serif;
-        font-size: 0.95rem;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 12px;
+        font-weight: 600;
         z-index: 10;
+        text-align: center;
       }
       .iframe-container {
         position: absolute;
-        top: 42px;
+        top: ${containerTop};
         left: 0;
         right: 0;
         bottom: 0;
@@ -107,9 +114,9 @@ function getWebviewHtml(port: number): string {
     </style>
   </head>
   <body>
-    <div class="banner">Prompt Forge is running on port ${port}. Reload the panel if needed.</div>
+    ${banner}
     <div class="iframe-container">
-      <iframe src="http://127.0.0.1:${port}/"></iframe>
+      <iframe src="${url}"></iframe>
     </div>
   </body>
 </html>`;
@@ -164,64 +171,74 @@ export function activate(context: vscode.ExtensionContext) {
   const output = vscode.window.createOutputChannel("Prompt Forge Server");
 
   const openCommand = vscode.commands.registerCommand("promptForge.open", async () => {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    if (!workspaceFolder) {
-      vscode.window.showErrorMessage("Open a workspace folder before launching Prompt Forge.");
-      return;
-    }
-
-    const workspaceRoot = workspaceFolder.uri.fsPath;
-    const appPath = path.join(workspaceRoot, "app.py");
-
-    if (!(await canFileExist(appPath))) {
-      vscode.window.showErrorMessage("Could not find app.py in the workspace root.");
-      return;
-    }
-
-    // Kill any existing process before starting a new one
-    if (promptForgeProcess && !promptForgeProcess.killed) {
-      stopPromptForge(output);
-    }
-
-    output.show(true);
-    output.appendLine("Starting Prompt Forge Python server...");
-
-    // Find an available port
-    let port = 7860;
-    try {
-      port = await findAvailablePort();
-      output.appendLine(`Using port ${port}`);
-    } catch (err) {
-      vscode.window.showErrorMessage(`Could not find an available port: ${err instanceof Error ? err.message : err}`);
-      return;
-    }
-
-    promptForgeProcess = launchPromptForge(appPath, workspaceRoot, port, output);
-
-    try {
-      await waitForServer(port, 120000);
-    } catch (err) {
-      vscode.window.showErrorMessage(`Prompt Forge did not start in time: ${err instanceof Error ? err.message : err}`);
-      return;
-    }
-
-    currentPort = port;
     if (currentPanel) {
-      currentPanel.dispose();
+      currentPanel.reveal(vscode.ViewColumn.One);
+    } else {
+      currentPanel = vscode.window.createWebviewPanel("promptForge", "Prompt Forge", vscode.ViewColumn.One, {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+      });
+
+      currentPanel.onDidDispose(() => {
+        currentPanel = undefined;
+      });
     }
 
-    currentPanel = vscode.window.createWebviewPanel("promptForge", "Prompt Forge", vscode.ViewColumn.One, {
-      enableScripts: true,
-      retainContextWhenHidden: true,
-    });
-    currentPanel.webview.html = getWebviewHtml(port);
+    const config = vscode.workspace.getConfiguration("promptForge");
+    const mode = config.get<string>("mode") || "cloud";
+    const hfUrl = config.get<string>("hfUrl") || "https://huggingface.co/spaces/Becher-zribi/prompt-forge-rag";
 
-    currentPanel.onDidDispose(() => {
-      currentPanel = undefined;
-    });
+    if (mode === "cloud") {
+      output.appendLine(`Opening Cloud Mode: ${hfUrl}`);
+      currentPanel.webview.html = getWebviewHtml(hfUrl, "cloud");
+    } else {
+      const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+      if (!workspaceFolder) {
+        vscode.window.showErrorMessage("Open a workspace folder before launching Prompt Forge.");
+        return;
+      }
 
-    vscode.window.showInformationMessage(`Prompt Forge is ready on port ${port}`);
+      const workspaceRoot = workspaceFolder.uri.fsPath;
+      const appPath = path.join(workspaceRoot, "app.py");
+
+      if (!(await canFileExist(appPath))) {
+        vscode.window.showErrorMessage("Could not find app.py in the workspace root.");
+        return;
+      }
+
+      // Kill any existing process before starting a new one
+      if (promptForgeProcess && !promptForgeProcess.killed) {
+        stopPromptForge(output);
+      }
+
+      output.show(true);
+      output.appendLine("Starting Prompt Forge Python server...");
+
+      // Find an available port
+      let port = 7860;
+      try {
+        port = await findAvailablePort();
+        output.appendLine(`Using port ${port}`);
+      } catch (err) {
+        vscode.window.showErrorMessage(`Could not find an available port: ${err instanceof Error ? err.message : err}`);
+        return;
+      }
+
+      promptForgeProcess = launchPromptForge(appPath, workspaceRoot, port, output);
+
+      try {
+        await waitForServer(port, 120000);
+      } catch (err) {
+        vscode.window.showErrorMessage(`Prompt Forge did not start in time: ${err instanceof Error ? err.message : err}`);
+        return;
+      }
+
+      currentPort = port;
+      currentPanel.webview.html = getWebviewHtml(`http://127.0.0.1:${port}/`, "local");
+      vscode.window.showInformationMessage(`Prompt Forge is ready on port ${port}`);
+    }
   });
+
 
   const stopCommand = vscode.commands.registerCommand("promptForge.stop", async () => {
     stopPromptForge(output);

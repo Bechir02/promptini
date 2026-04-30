@@ -1,9 +1,14 @@
 {
   "name": "prompt-forge-vscode",
   "displayName": "Prompt Forge",
-  "description": "Open the Prompt Forge Gradio app inside VS Code.",
+  "description": "Transform messy notes into model-optimized prompts with RAG-powered intelligence. Supports Claude, GPT-4, Gemini, and more.",
   "version": "0.1.0",
+  "icon": "icon.png",
   "publisher": "promptforge",
+  "repository": {
+    "type": "git",
+    "url": "https://huggingface.co/spaces/Becher-zribi/prompt-forge-rag"
+  },
   "engines": {
     "vscode": "^1.88.0"
   },
@@ -25,7 +30,23 @@
         "command": "promptForge.stop",
         "title": "Prompt Forge: Stop App"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Prompt Forge",
+      "properties": {
+        "promptForge.mode": {
+          "type": "string",
+          "enum": ["cloud", "local"],
+          "default": "cloud",
+          "description": "Whether to use the Hugging Face Cloud version or a local Python server."
+        },
+        "promptForge.hfUrl": {
+          "type": "string",
+          "default": "https://huggingface.co/spaces/Becher-zribi/prompt-forge-rag",
+          "description": "The URL of your Hugging Face Space (if mode is set to cloud)."
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

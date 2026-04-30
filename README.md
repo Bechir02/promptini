@@ -47,10 +47,16 @@ code --install-extension prompt-forge-vscode-0.1.0.vsix
 
 ### How It Works
 
-- Detects and uses the first available port starting from 7860
-- Spawns `app.py` with `GRADIO_SERVER_PORT` environment variable
-- Waits for the Gradio server to boot
+- Spawns `app.py` with `GRADIO_SERVER_PORT` environment variable (Local Mode)
+- **New: Cloud Mode** — Connect directly to the Hugging Face Space without local Python setup
 - Embeds the UI in a lightweight VS Code Webview
 - Manages the Python process lifecycle automatically
+
+### How to use Cloud Mode
+
+1. Install the extension `.vsix`.
+2. Go to VS Code Settings and search for `Prompt Forge: Mode`.
+3. Set it to `cloud`.
+4. Run `Prompt Forge: Open App`.
 
 For detailed information, see [vscode-extension/README.md](vscode-extension/README.md).

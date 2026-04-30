@@ -1,11 +1,13 @@
-echo ".venv/
+.venv/
 __pycache__/
 *.pyc
 .env
 lancedb_store/
 *.egg-info/
-.DS_Store" > .gitignore
-.venv/
-__pycache__/
-*.pyc
-.env
+.DS_Store
+
+# VS Code Extension binaries
+vscode-extension/out/
+vscode-extension/node_modules/
+vscode-extension/*.vsix
+vscode-extension/*.png
