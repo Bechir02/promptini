@@ -358,15 +358,27 @@ with gr.Blocks(title="Prompt Forge", css=CSS) as demo:
                 elem_classes= "meta-text",
             )
 
-            copy_btn = gr.Button(
-                "Copy to clipboard",
-                variant = "secondary",
-                size    = "lg",
-            )
+            with gr.Row():
+                copy_btn = gr.Button(
+                    "Copy",
+                    variant = "secondary",
+                    size    = "sm",
+                )
+                save_btn = gr.Button(
+                    "⭐ Save to Library",
+                    variant = "secondary",
+                    size    = "sm",
+                )
+
+    # Library Row
+    with gr.Row():
+        with gr.Column(elem_classes="bottom-card"):
+            with gr.Accordion("📚 Your Prompt Library", open=False):
+                library_status = gr.Markdown("No prompts saved yet. Forge and save some!")
+                library_list = gr.HTML("<div id='library-container'>Your library will appear here...</div>")
 
     # Bottom row
     with gr.Row(equal_height=True):
-
         with gr.Column(scale=1, elem_classes="bottom-card"):
             exemplar_display = gr.Textbox(
                 label       = "Matched exemplars",
@@ -396,15 +408,70 @@ with gr.Blocks(title="Prompt Forge", css=CSS) as demo:
         js="(v) => { navigator.clipboard.writeText(v); alert('Copied to clipboard!'); }"
     )
 
+    save_btn.click(
+        fn=None,
+        inputs=[output_display, model_dropdown, status_display],
+        js="""
+        (prompt, model, status) => {
+            window.parent.postMessage({
+                type: 'savePrompt',
+                entry: {
+                    prompt: prompt,
+                    model: model,
+                    status: status
+                }
+            }, '*');
+        }
+        """
+    )
+
     # Inject JS to handle messages from VS Code
     demo.load(None, None, None, js="""
     () => {
         window.addEventListener('message', (event) => {
-            if (event.data.type === 'setPrompt') {
-                const textarea = document.querySelector('textarea[data-testid="textbox"]');
-                if (textarea) {
-                    textarea.value = event.data.text;
-                    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+            const data = event.data;
+            if (data.type === 'setPrompt') {
+                const textareas = document.querySelectorAll('textarea[data-testid="textbox"]');
+                if (textareas.length > 0) {
+                    textareas[0].value = data.text;
+                    textareas[0].dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            } else if (data.type === 'syncLibrary') {
+                const container = document.getElementById('library-container');
+                if (container && data.library) {
+                    if (data.library.length === 0) {
+                        container.innerHTML = "<p style='color:#999;font-size:13px;'>No prompts saved yet.</p>";
+                        return;
+                    }
+                    let html = "<div style='display:grid;gap:12px;'>";
+                    data.library.forEach(item => {
+                        const date = new Date(item.date).toLocaleDateString();
+                        html += `
+                            <div style="background:#f9f9f8;padding:12px;border-radius:12px;border:0.5px solid #eee;">
+                                <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+                                    <span style="font-size:11px;font-weight:600;color:#c4633e;text-transform:uppercase;">${item.model}</span>
+                                    <span style="font-size:11px;color:#999;">${date}</span>
+                                </div>
+                                <div style="font-size:13px;color:#444;margin-bottom:10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.5;">${item.prompt}</div>
+                                <button onclick="window.loadFavorite('${item.id}')" style="background:white;border:0.5px solid #ddd;border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:600;">Load Prompt</button>
+                            </div>
+                        `;
+                    });
+                    html += "</div>";
+                    container.innerHTML = html;
+                    
+                    // Add global function for loading
+                    window.loadFavorite = (id) => {
+                        const entry = data.library.find(i => i.id === id);
+                        if (entry) {
+                            const textareas = document.querySelectorAll('textarea[data-testid="textbox"]');
+                            if (textareas.length > 1) {
+                                textareas[1].value = entry.prompt;
+                                textareas[1].dispatchEvent(new Event('input', { bubbles: true }));
+                                alert("Prompt loaded into 'Structured prompt' field.");
+                            }
+                        }
+                    };
                 }
             }
         });
