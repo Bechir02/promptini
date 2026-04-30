@@ -1,7 +1,9 @@
 import functools
+import hashlib
 import logging
 import os
 import json
+import pickle
 import lancedb
 from sentence_transformers import SentenceTransformer
 from pathlib import Path
@@ -9,10 +11,11 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 # ── Config ──────────────────────────────────────────────────────────────────
-PROMPTS_FILE = "prompts.json"
-DB_PATH      = "lancedb_store"
-TABLE_NAME   = "prompts"
-MODEL_NAME   = "BAAI/bge-small-en-v1.5"
+PROMPTS_FILE    = "prompts.json"
+DB_PATH         = "lancedb_store"
+TABLE_NAME      = "prompts"
+MODEL_NAME      = "BAAI/bge-small-en-v1.5"
+EMBEDDING_CACHE = "embedding_cache.pkl"
 
 # ── Load embedding model ─────────────────────────────────────────────────────
 _model = None
@@ -25,7 +28,7 @@ def get_model():
         print("Model loaded.")
     return _model
 
-@functools.lru_cache(maxsize=256)
+@functools.lru_cache(maxsize=512)
 def _embed_cached(text: str) -> tuple[float, ...]:
     prefixed = f"Represent this sentence for retrieval: {text}"
     vector   = get_model().encode(prefixed, normalize_embeddings=True)
@@ -34,6 +37,39 @@ def _embed_cached(text: str) -> tuple[float, ...]:
 def embed(text: str) -> list[float]:
     """Embed a single string using BGE-small with an in-process cache."""
     return list(_embed_cached(text))
+
+# ── Persistent embedding cache ───────────────────────────────────────────────
+def _get_cache_key(prompts: list[dict]) -> str:
+    """Generate a hash of prompts.json content so cache invalidates on changes."""
+    content = json.dumps([p.get('id', '') for p in prompts], sort_keys=True)
+    return hashlib.md5(content.encode()).hexdigest()
+
+def _load_embedding_cache(prompts: list[dict]) -> list | None:
+    """Load cached embeddings from disk if they match the current prompts."""
+    cache_path = Path(EMBEDDING_CACHE)
+    if not cache_path.exists():
+        return None
+    try:
+        with open(cache_path, 'rb') as f:
+            cached = pickle.load(f)
+        if cached.get('key') == _get_cache_key(prompts):
+            print(f"✅ Loaded {len(cached['vectors'])} cached embeddings from disk.")
+            return cached['vectors']
+        else:
+            print("Cache key mismatch — regenerating embeddings.")
+            return None
+    except Exception as e:
+        print(f"Cache load failed: {e} — regenerating.")
+        return None
+
+def _save_embedding_cache(prompts: list[dict], vectors: list):
+    """Save embeddings to disk for fast cold starts."""
+    try:
+        with open(EMBEDDING_CACHE, 'wb') as f:
+            pickle.dump({'key': _get_cache_key(prompts), 'vectors': vectors}, f)
+        print(f"💾 Saved {len(vectors)} embeddings to cache.")
+    except Exception as e:
+        print(f"Cache save failed: {e}")
 
 # ── Build or rebuild the index ───────────────────────────────────────────────
 def build_index(force: bool = False):
@@ -48,24 +84,33 @@ def build_index(force: bool = False):
     with open(PROMPTS_FILE, "r", encoding="utf-8") as f:
         prompts = json.load(f)
 
-    print(f"Loaded {len(prompts)} prompts. Embedding in batch...")
+    print(f"Loaded {len(prompts)} prompts.")
 
-    # Build all texts first
-    texts = [
-        f"Represent this sentence for retrieval: "
-        f"{p.get('task_type','')} "
-        f"{p.get('target_model','')} "
-        f"{p.get('prompt','')[:300]}"
-        for p in prompts
-    ]
+    # Try to load cached embeddings first
+    cached_vectors = _load_embedding_cache(prompts)
+    
+    if cached_vectors is not None:
+        vectors = cached_vectors
+    else:
+        print("Embedding in batch (this is slow on first run only)...")
+        # Build all texts first
+        texts = [
+            f"Represent this sentence for retrieval: "
+            f"{p.get('task_type','')} "
+            f"{p.get('target_model','')} "
+            f"{p.get('prompt','')[:300]}"
+            for p in prompts
+        ]
 
-    # Batch embed all at once — much faster than one by one
-    vectors = get_model().encode(
-        texts,
-        normalize_embeddings = True,
-        batch_size           = 64,
-        show_progress_bar    = True,
-    )
+        # Batch embed all at once — much faster than one by one
+        vectors = get_model().encode(
+            texts,
+            normalize_embeddings = True,
+            batch_size           = 64,
+            show_progress_bar    = True,
+        )
+        vectors = [v.tolist() for v in vectors]
+        _save_embedding_cache(prompts, vectors)
 
     rows = []
     for i, (p, vector) in enumerate(zip(prompts, vectors)):
@@ -77,7 +122,7 @@ def build_index(force: bool = False):
             "source_repo":  p.get("source_repo", ""),
             "license":      p.get("license", ""),
             "quality_score":float(p.get("quality_score", 5)),
-            "vector":       vector.tolist(),
+            "vector":       vector if isinstance(vector, list) else vector.tolist(),
         })
 
     db = lancedb.connect(DB_PATH)
