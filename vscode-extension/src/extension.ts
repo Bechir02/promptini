@@ -273,7 +273,7 @@ class PromptForgeSidebarProvider implements vscode.WebviewViewProvider {
     };
 
     const config = vscode.workspace.getConfiguration("promptForge");
-    const hfUrl = config.get<string>("hfUrl") || "https://huggingface.co/spaces/Becher-zribi/prompt-forge-rag";
+    const hfUrl = config.get<string>("hfUrl") || "https://becher-zribi-prompt-forge-rag.hf.space";
     
     webviewView.webview.html = getWebviewHtml(hfUrl, "cloud");
     setupMessageHandler(webviewView.webview, this._context);

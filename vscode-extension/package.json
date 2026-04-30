@@ -7,7 +7,7 @@
   "publisher": "BecherZribi",
   "repository": {
     "type": "git",
-    "url": "https://huggingface.co/spaces/Becher-zribi/prompt-forge-rag"
+    "url": "https://becher-zribi-prompt-forge-rag.hf.space"
   },
   "engines": {
     "vscode": "^1.88.0"
@@ -72,7 +72,7 @@
         },
         "promptForge.hfUrl": {
           "type": "string",
-          "default": "https://huggingface.co/spaces/Becher-zribi/prompt-forge-rag",
+          "default": "https://becher-zribi-prompt-forge-rag.hf.space",
           "description": "The URL of your Hugging Face Space (if mode is set to cloud)."
         }
       }
