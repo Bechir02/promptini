@@ -2,7 +2,7 @@
   "name": "prompt-forge-vscode",
   "displayName": "Prompt Forge",
   "description": "Transform messy notes into model-optimized prompts with RAG-powered intelligence. Supports Claude, GPT-4, Gemini, and more.",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "icon": "icon.png",
   "publisher": "BecherZribi",
   "repository": {
