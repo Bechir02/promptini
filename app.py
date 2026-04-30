@@ -434,4 +434,4 @@ with gr.Blocks(title="Prompt Forge Arena") as demo:
     """)
 
 if __name__ == "__main__":
-    demo.launch(css=CSS)
+    demo.launch(css=CSS, ssr_mode=False)
