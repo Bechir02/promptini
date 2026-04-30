@@ -31,9 +31,9 @@ DEPTHS = ["concise", "standard", "comprehensive"]
 # ── Core function ─────────────────────────────────────────────────────────────
 def forge(raw_prompt: str, target_models: list[str], depth: str):
     if not raw_prompt or not raw_prompt.strip():
-        return [""] * 10
+        return [""] * 11
     if not target_models:
-        return [""] * 10
+        return [""] * 11
         
     # limit to 2 for arena
     selected_models = target_models[:2]
@@ -342,7 +342,7 @@ with gr.Blocks(title="Prompt Forge Arena") as demo:
     with gr.Row():
         with gr.Column(elem_classes="bottom-card"):
             with gr.Accordion("📚 Your Prompt Library", open=False):
-                library_list = gr.HTML("<div id='library-container'>Loading...</div>")
+                library_list = gr.HTML("<div id='library-container'><p style='color:#999;font-size:13px;'>No saved prompts yet. Use the VS Code sidebar to save prompts.</p></div>")
         
         with gr.Column(elem_classes="bottom-card"):
             exemplar_display = gr.Textbox(

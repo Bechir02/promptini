@@ -9,6 +9,24 @@ let promptForgeProcess: ChildProcess | undefined;
 let currentPort: number | undefined;
 let currentPanel: vscode.WebviewPanel | undefined;
 
+// ── Prompt Library (persisted in globalState) ────────────────────────────────
+interface LibraryEntry {
+  id: string;
+  prompt: string;
+  model: string;
+  status: string;
+  date: string;
+}
+
+function getLibrary(ctx: vscode.ExtensionContext): LibraryEntry[] {
+  return ctx.globalState.get<LibraryEntry[]>("promptForgeLibrary", []);
+}
+
+function saveLibrary(ctx: vscode.ExtensionContext, lib: LibraryEntry[]) {
+  ctx.globalState.update("promptForgeLibrary", lib);
+}
+
+// ── Utility functions ────────────────────────────────────────────────────────
 function canFileExist(filePath: string): Promise<boolean> {
   return new Promise((resolve) => {
     fs.access(filePath, fs.constants.F_OK, (err) => {
@@ -64,6 +82,7 @@ function waitForServer(port: number, timeoutMs: number): Promise<void> {
   });
 }
 
+// ── Webview HTML with message bridge ─────────────────────────────────────────
 function getWebviewHtml(url: string, mode: string): string {
   const banner = mode === "local" 
     ? `<div class="banner">Local Server Running. Port: ${new URL(url).port}</div>`
@@ -116,12 +135,41 @@ function getWebviewHtml(url: string, mode: string): string {
   <body>
     ${banner}
     <div class="iframe-container">
-      <iframe src="${url}"></iframe>
+      <iframe id="app-frame" src="${url}"></iframe>
     </div>
+    <script>
+      const vscode = acquireVsCodeApi();
+
+      // Listen for messages FROM the Gradio iframe (via window.top.postMessage)
+      window.addEventListener('message', (event) => {
+        const data = event.data;
+        if (!data || !data.type) return;
+
+        // Forward to the VS Code extension host
+        if (data.type === 'copyText' || data.type === 'savePrompt' || data.type === 'ready') {
+          vscode.postMessage(data);
+        }
+      });
+
+      // Listen for messages FROM the VS Code extension host
+      window.addEventListener('message', (event) => {
+        const data = event.data;
+        if (!data || !data.type) return;
+
+        // Forward to the Gradio iframe
+        if (data.type === 'syncLibrary' || data.type === 'setPrompt') {
+          const iframe = document.getElementById('app-frame');
+          if (iframe && iframe.contentWindow) {
+            iframe.contentWindow.postMessage(data, '*');
+          }
+        }
+      });
+    </script>
   </body>
 </html>`;
 }
 
+// ── Python launcher ──────────────────────────────────────────────────────────
 function choosePythonCommand(): string {
     const venvPython = "/Users/mac/Desktop/prompt-forge-rag/.venv/bin/python3";
     if (require("fs").existsSync(venvPython)) {
@@ -129,6 +177,7 @@ function choosePythonCommand(): string {
     }
     return process.platform === "win32" ? "python" : "python3";
 }
+
 function launchPromptForge(appPath: string, cwd: string, port: number, output: vscode.OutputChannel): ChildProcess {
   const python = choosePythonCommand();
   const env = { ...process.env, GRADIO_SERVER_PORT: port.toString() };
@@ -167,9 +216,91 @@ function stopPromptForge(output: vscode.OutputChannel) {
   }
 }
 
+// ── Message handler (shared between sidebar and panel) ───────────────────────
+function setupMessageHandler(
+  webview: vscode.Webview,
+  context: vscode.ExtensionContext
+) {
+  webview.onDidReceiveMessage((message: any) => {
+    switch (message.type) {
+      case "copyText": {
+        if (message.text) {
+          vscode.env.clipboard.writeText(message.text).then(() => {
+            vscode.window.showInformationMessage("📋 Prompt copied to clipboard!");
+          });
+        }
+        break;
+      }
+      case "savePrompt": {
+        if (message.entry) {
+          const lib = getLibrary(context);
+          const entry: LibraryEntry = {
+            id: Date.now().toString(),
+            prompt: message.entry.prompt || "",
+            model: message.entry.model || "unknown",
+            status: message.entry.status || "",
+            date: new Date().toISOString(),
+          };
+          lib.unshift(entry);
+          saveLibrary(context, lib);
+          vscode.window.showInformationMessage("⭐ Prompt saved to library!");
+          // Sync back to webview
+          webview.postMessage({ type: "syncLibrary", library: lib });
+        }
+        break;
+      }
+      case "ready": {
+        const lib = getLibrary(context);
+        webview.postMessage({ type: "syncLibrary", library: lib });
+        break;
+      }
+    }
+  });
+}
+
+// ── Sidebar WebviewViewProvider ──────────────────────────────────────────────
+class PromptForgeSidebarProvider implements vscode.WebviewViewProvider {
+  public static readonly viewType = "promptForgeView";
+  private _view?: vscode.WebviewView;
+
+  constructor(private readonly _context: vscode.ExtensionContext) {}
+
+  resolveWebviewView(webviewView: vscode.WebviewView) {
+    this._view = webviewView;
+
+    webviewView.webview.options = {
+      enableScripts: true,
+    };
+
+    const config = vscode.workspace.getConfiguration("promptForge");
+    const hfUrl = config.get<string>("hfUrl") || "https://huggingface.co/spaces/Becher-zribi/prompt-forge-rag";
+    
+    webviewView.webview.html = getWebviewHtml(hfUrl, "cloud");
+    setupMessageHandler(webviewView.webview, this._context);
+  }
+
+  public sendPrompt(text: string) {
+    if (this._view) {
+      this._view.webview.postMessage({ type: "setPrompt", text });
+    }
+  }
+}
+
+// ── Activation ──────────────────────────────────────────────────────────────
 export function activate(context: vscode.ExtensionContext) {
   const output = vscode.window.createOutputChannel("Prompt Forge Server");
 
+  // Register sidebar provider
+  const sidebarProvider = new PromptForgeSidebarProvider(context);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      PromptForgeSidebarProvider.viewType,
+      sidebarProvider,
+      { webviewOptions: { retainContextWhenHidden: true } }
+    )
+  );
+
+  // "Open App" command — opens in a full editor panel
   const openCommand = vscode.commands.registerCommand("promptForge.open", async () => {
     if (currentPanel) {
       currentPanel.reveal(vscode.ViewColumn.One);
@@ -191,6 +322,7 @@ export function activate(context: vscode.ExtensionContext) {
     if (mode === "cloud") {
       output.appendLine(`Opening Cloud Mode: ${hfUrl}`);
       currentPanel.webview.html = getWebviewHtml(hfUrl, "cloud");
+      setupMessageHandler(currentPanel.webview, context);
     } else {
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
       if (!workspaceFolder) {
@@ -206,7 +338,6 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       }
 
-      // Kill any existing process before starting a new one
       if (promptForgeProcess && !promptForgeProcess.killed) {
         stopPromptForge(output);
       }
@@ -214,7 +345,6 @@ export function activate(context: vscode.ExtensionContext) {
       output.show(true);
       output.appendLine("Starting Prompt Forge Python server...");
 
-      // Find an available port
       let port = 7860;
       try {
         port = await findAvailablePort();
@@ -235,10 +365,21 @@ export function activate(context: vscode.ExtensionContext) {
 
       currentPort = port;
       currentPanel.webview.html = getWebviewHtml(`http://127.0.0.1:${port}/`, "local");
+      setupMessageHandler(currentPanel.webview, context);
       vscode.window.showInformationMessage(`Prompt Forge is ready on port ${port}`);
     }
   });
 
+  // "Forge Selection" command — sends selected text to the sidebar
+  const forgeSelectionCmd = vscode.commands.registerCommand("promptForge.forgeSelection", () => {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) return;
+    const selection = editor.document.getText(editor.selection);
+    if (selection) {
+      sidebarProvider.sendPrompt(selection);
+      vscode.window.showInformationMessage("Text sent to Prompt Forge sidebar.");
+    }
+  });
 
   const stopCommand = vscode.commands.registerCommand("promptForge.stop", async () => {
     stopPromptForge(output);
@@ -246,7 +387,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.showInformationMessage("Prompt Forge has been stopped.");
   });
 
-  context.subscriptions.push(openCommand, stopCommand);
+  context.subscriptions.push(openCommand, stopCommand, forgeSelectionCmd);
 }
 
 export function deactivate() {

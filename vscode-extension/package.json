@@ -16,11 +16,28 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:promptForge.open",
-    "onCommand:promptForge.stop"
+    "onView:promptForgeView"
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "prompt-forge-container",
+          "title": "Prompt Forge",
+          "icon": "icon.png"
+        }
+      ]
+    },
+    "views": {
+      "prompt-forge-container": [
+        {
+          "id": "promptForgeView",
+          "name": "Prompt Forge",
+          "type": "webview"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "promptForge.open",
@@ -29,8 +46,21 @@
       {
         "command": "promptForge.stop",
         "title": "Prompt Forge: Stop App"
+      },
+      {
+        "command": "promptForge.forgeSelection",
+        "title": "Prompt Forge: Forge Selection"
       }
     ],
+    "menus": {
+      "editor/context": [
+        {
+          "when": "editorHasSelection",
+          "command": "promptForge.forgeSelection",
+          "group": "1_modification"
+        }
+      ]
+    },
     "configuration": {
       "title": "Prompt Forge",
       "properties": {
