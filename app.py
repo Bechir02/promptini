@@ -68,12 +68,18 @@ def forge(raw_prompt: str, target_models: list[str], depth: str):
         from scorer import judge_battle
         battle = judge_battle(raw_prompt, out1, selected_models[0], out2, selected_models[1])
         battle_note = f"🏆 WINNER: Version {battle['winner']} ({selected_models[0] if battle['winner']=='A' else selected_models[1]})\n\nWHY: {battle['reasoning']}"
+
+    # Format exemplars
+    exemplars_str = "No exemplars found."
+    if results[0]["res"].get("exemplars"):
+        ex_list = [f"EXAMPLE {i+1} [{ex['target_model']}]:\n{ex['prompt'][:200]}..." for i, ex in enumerate(results[0]["res"]["exemplars"])]
+        exemplars_str = "\n\n".join(ex_list)
         
     return (
         out1, status1, score1, 
         out2, status2, score2, 
         arena_vis, battle_note,
-        meta1, meta2
+        meta1, meta2, exemplars_str
     )
 
 
@@ -354,7 +360,7 @@ with gr.Blocks(title="Prompt Forge Arena") as demo:
             output_1, status_1, score_1, 
             output_2, status_2, score_2, 
             col_2, battle_note,
-            meta_1, meta_2
+            meta_1, meta_2, exemplar_display
         ]
     )
     
