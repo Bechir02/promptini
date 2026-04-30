@@ -15,14 +15,20 @@ TABLE_NAME   = "prompts"
 MODEL_NAME   = "BAAI/bge-small-en-v1.5"
 
 # ── Load embedding model ─────────────────────────────────────────────────────
-print("Loading embedding model...")
-embedder = SentenceTransformer(MODEL_NAME)
-print("Model loaded.")
+_model = None
+
+def get_model():
+    global _model
+    if _model is None:
+        print("Loading embedding model...")
+        _model = SentenceTransformer(MODEL_NAME)
+        print("Model loaded.")
+    return _model
 
 @functools.lru_cache(maxsize=256)
 def _embed_cached(text: str) -> tuple[float, ...]:
     prefixed = f"Represent this sentence for retrieval: {text}"
-    vector   = embedder.encode(prefixed, normalize_embeddings=True)
+    vector   = get_model().encode(prefixed, normalize_embeddings=True)
     return tuple(vector.tolist())
 
 def embed(text: str) -> list[float]:

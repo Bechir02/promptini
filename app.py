@@ -390,8 +390,6 @@ with gr.Blocks(title="Prompt Forge", css=CSS) as demo:
         outputs=[output_display, status_display, exemplar_display, score_display, output_meta]
     )
 
-    )
-
     copy_btn.click(
         fn=None,
         inputs=output_display,
