@@ -366,21 +366,42 @@ with gr.Blocks(title="Prompt Forge Arena") as demo:
     
     battle_note.change(lambda x: gr.update(visible=bool(x)), inputs=battle_note, outputs=arena_note_row)
 
-    copy_btn_1.click(fn=None, inputs=output_1, js="(v) => { window.top.postMessage({ type: 'copyText', text: v }, '*'); }")
-    copy_btn_2.click(fn=None, inputs=output_2, js="(v) => { window.top.postMessage({ type: 'copyText', text: v }, '*'); }")
+    copy_js = """
+    (v) => {
+        // 1. Try native clipboard (works on standalone HF page)
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(v).then(() => {
+                // Show a brief visual confirmation
+                const btn = document.activeElement;
+                if (btn) {
+                    const orig = btn.textContent;
+                    btn.textContent = '✅ Copied!';
+                    setTimeout(() => { btn.textContent = orig; }, 1500);
+                }
+            }).catch(() => {});
+        }
+        // 2. Also post to VS Code parent (works inside sidebar iframe)
+        try { window.top.postMessage({ type: 'copyText', text: v }, '*'); } catch(e) {}
+    }
+    """
+
+    copy_btn_1.click(fn=None, inputs=output_1, js=copy_js)
+    copy_btn_2.click(fn=None, inputs=output_2, js=copy_js)
 
     def get_save_js(index):
         return f"""
         (prompt, model, status) => {{
             const targetModel = Array.isArray(model) ? model[0] : model;
-            window.top.postMessage({{
-                type: 'savePrompt',
-                entry: {{
-                    prompt: prompt,
-                    model: targetModel,
-                    status: status
-                }}
-            }}, '*');
+            const entry = {{ prompt: prompt, model: targetModel, status: status }};
+            // Post to VS Code
+            try {{ window.top.postMessage({{ type: 'savePrompt', entry: entry }}, '*'); }} catch(e) {{}}
+            // Visual feedback on standalone
+            const btn = document.activeElement;
+            if (btn) {{
+                const orig = btn.textContent;
+                btn.textContent = '✅ Saved!';
+                setTimeout(() => {{ btn.textContent = orig; }}, 1500);
+            }}
         }}
         """
 

@@ -438,3 +438,17 @@ def transform_prompt(
             f"Last error: {e}\n"
             f"Check your API keys in HF Space Secrets."
         )
+
+
+def call_llm(prompt: str, model: str = "groq", response_format: str = "text") -> str:
+    """Unified helper used by scorer.py for LLM-as-a-Judge evaluations."""
+    system = "You are a helpful assistant."
+    if "json" in response_format:
+        system += " You must respond in valid JSON format."
+
+    try:
+        res, _ = call_groq(system, prompt)
+        return res
+    except Exception:
+        res, _ = call_cerebras(system, prompt)
+        return res
