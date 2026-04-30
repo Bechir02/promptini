@@ -390,11 +390,28 @@ with gr.Blocks(title="Prompt Forge", css=CSS) as demo:
         outputs=[output_display, status_display, exemplar_display, score_display, output_meta]
     )
 
+    )
+
     copy_btn.click(
         fn=None,
         inputs=output_display,
         js="(v) => { navigator.clipboard.writeText(v); alert('Copied to clipboard!'); }"
     )
+
+    # Inject JS to handle messages from VS Code
+    demo.load(None, None, None, js="""
+    () => {
+        window.addEventListener('message', (event) => {
+            if (event.data.type === 'setPrompt') {
+                const textarea = document.querySelector('textarea[data-testid="textbox"]');
+                if (textarea) {
+                    textarea.value = event.data.text;
+                    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            }
+        });
+    }
+    """)
 
 if __name__ == "__main__":
     demo.launch()

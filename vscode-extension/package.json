@@ -4,7 +4,7 @@
   "description": "Transform messy notes into model-optimized prompts with RAG-powered intelligence. Supports Claude, GPT-4, Gemini, and more.",
   "version": "0.1.0",
   "icon": "icon.png",
-  "publisher": "promptforge",
+  "publisher": "BecherZribi",
   "repository": {
     "type": "git",
     "url": "https://huggingface.co/spaces/Becher-zribi/prompt-forge-rag"
