@@ -271,7 +271,7 @@ button.secondary:hover { background: #efefed !important; transform: translateY(-
 """
 
 # ── UI ────────────────────────────────────────────────────────────────────────
-with gr.Blocks(title="Prompt Forge Arena", css=CSS) as demo:
+with gr.Blocks(title="Prompt Forge Arena") as demo:
 
     # Header
     gr.Markdown("""
@@ -360,14 +360,14 @@ with gr.Blocks(title="Prompt Forge Arena", css=CSS) as demo:
     
     battle_note.change(lambda x: gr.update(visible=bool(x)), inputs=battle_note, outputs=arena_note_row)
 
-    copy_btn_1.click(fn=None, inputs=output_1, js="(v) => { window.parent.postMessage({ type: 'copyText', text: v }, '*'); }")
-    copy_btn_2.click(fn=None, inputs=output_2, js="(v) => { window.parent.postMessage({ type: 'copyText', text: v }, '*'); }")
+    copy_btn_1.click(fn=None, inputs=output_1, js="(v) => { window.top.postMessage({ type: 'copyText', text: v }, '*'); }")
+    copy_btn_2.click(fn=None, inputs=output_2, js="(v) => { window.top.postMessage({ type: 'copyText', text: v }, '*'); }")
 
     def get_save_js(index):
         return f"""
         (prompt, model, status) => {{
             const targetModel = Array.isArray(model) ? model[0] : model;
-            window.parent.postMessage({{
+            window.top.postMessage({{
                 type: 'savePrompt',
                 entry: {{
                     prompt: prompt,
@@ -423,15 +423,15 @@ with gr.Blocks(title="Prompt Forge Arena", css=CSS) as demo:
                             if (textareas.length > 0) {
                                 textareas[0].value = entry.prompt;
                                 textareas[0].dispatchEvent(new Event('input', { bubbles: true }));
-                                alert("Prompt loaded into input field.");
                             }
                         }
                     };
                 }
             }
         });
+        window.top.postMessage({ type: 'ready' }, '*');
     }
     """)
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(css=CSS)
