@@ -223,6 +223,49 @@ def score_improvement(raw: str, output: str) -> dict:
     }
 
 
+def judge_battle(raw_prompt: str, output_a: str, model_a: str, output_b: str, model_b: str) -> dict:
+    """Uses LLM-as-a-judge to compare two transformations and pick a winner."""
+    prompt = f"""
+    You are an expert Prompt Engineer comparing two different optimized versions of the same raw input.
+    
+    RAW INPUT:
+    {raw_prompt}
+    
+    VERSION A (Target: {model_a}):
+    {output_a}
+    
+    VERSION B (Target: {model_b}):
+    {output_b}
+    
+    Evaluate both and decide which is better for the user's likely intent.
+    Consider:
+    1. Structure and clarity.
+    2. Adherence to model-specific best practices.
+    3. Removal of ambiguity.
+    
+    Return a JSON object:
+    {{
+        "winner": "A" or "B",
+        "reasoning": "Brief explanation of why the winner was chosen.",
+        "strengths_a": ["..."],
+        "strengths_b": ["..."]
+    }}
+    """
+    
+    try:
+        from llm import call_llm
+        response = call_llm(prompt, model="groq/llama-3.1-70b-versatile", response_format="json")
+        import json
+        return json.loads(response)
+    except Exception as e:
+        return {
+            "winner": "A",
+            "reasoning": f"Defaulting to A due to judge error: {str(e)}",
+            "strengths_a": [],
+            "strengths_b": []
+        }
+
+
 def score_with_llm(raw_prompt: str, output: str, target_model: str, task_type: str) -> dict:
     """Uses an LLM to evaluate the transformation on tone, utility, and adherence."""
     system_prompt = f"""You are an expert prompt engineering evaluator. Grade the following transformation from a "Messy Prompt" to a "Structured Prompt".

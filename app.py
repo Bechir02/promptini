@@ -29,71 +29,51 @@ MODELS = [
 DEPTHS = ["concise", "standard", "comprehensive"]
 
 # ── Core function ─────────────────────────────────────────────────────────────
-def forge(raw_prompt: str, target_model: str, depth: str):
+def forge(raw_prompt: str, target_models: list[str], depth: str):
     if not raw_prompt or not raw_prompt.strip():
-        return "", "", "", "", ""
-    if len(raw_prompt.strip()) < 15:
-        return "", "⚠ Prompt too short — add more detail.", "", "", ""
-    if target_model not in MODELS:
-        return "", "⚠ Invalid model.", "", "", ""
-    if depth not in DEPTHS:
-        return "", "⚠ Invalid depth.", "", "", ""
-
-    result = run_pipeline(
-        raw_prompt   = raw_prompt,
-        target_model = target_model,
-        depth        = depth,
-    )
-
-    if result["error"]:
-        return "", f"✗ {result['error']}", "", "", ""
-
-    score_result = score_transformation(
-        raw_prompt   = raw_prompt,
-        output       = result["transformed"],
-        target_model = target_model,
-        task_type    = result["task_type"],
-    )
-
-    exemplar_text = ""
-    if result["exemplars"]:
-        exemplar_text = "Matched prompt examples used for style + structure:\n\n"
-        for i, ex in enumerate(result["exemplars"], 1):
-            exemplar_text += (
-                f"{i:02d}  [{ex.get('target_model')}]  "
-                f"{ex.get('task_type')}  ·  "
-                f"{ex.get('source_repo')}\n"
-            )
-    else:
-        exemplar_text = "No exemplars retrieved."
-
-    score_text = format_score_for_ui(score_result)
-    meta = (
-        f"{len(result['transformed'])} chars · "
-        f"{len(result['transformed'].split())} words"
-    )
-
-    status = (
-        f"✓ {result['provider']} · "
-        f"task: {result['task_type']} · "
-        f"score: {score_result['overall']}/10"
-    )
-
-    reasoning_text = f"REASONING:\n{score_result['breakdown']['llm_judge']['note']}\n\n"
-    if score_result['breakdown']['llm_judge']['strengths']:
-        reasoning_text += "STRENGTHS:\n- " + "\n- ".join(score_result['breakdown']['llm_judge']['strengths']) + "\n\n"
-    if score_result['breakdown']['llm_judge']['weaknesses']:
-        reasoning_text += "WEAKNESSES:\n- " + "\n- ".join(score_result['breakdown']['llm_judge']['weaknesses'])
+        return [""] * 10
+    if not target_models:
+        return [""] * 10
+        
+    # limit to 2 for arena
+    selected_models = target_models[:2]
+    is_arena = len(selected_models) > 1
     
-    score_display_text = format_score_for_ui(score_result)
-    full_score_text = f"{score_display_text}\n\n{reasoning_text}"
-
+    results = []
+    for model_name in selected_models:
+        res = run_pipeline(raw_prompt=raw_prompt, target_model=model_name, depth=depth)
+        score_res = score_transformation(raw_prompt, res["transformed"], model_name, res["task_type"])
+        results.append({"res": res, "score": score_res, "model": model_name})
+        
+    # Prepare outputs
+    # [out1, status1, score1, out2, status2, score2, arena_row_vis, battle_note, meta1, meta2]
+    
+    out1 = results[0]["res"]["transformed"]
+    status1 = f"✓ {results[0]['model']} · score: {results[0]['score']['overall']}/10"
+    score1 = format_score_for_ui(results[0]["score"]) + "\n\nREASONING:\n" + results[0]["score"]["breakdown"]["llm_judge"]["note"]
+    meta1 = f"{len(out1)} chars · {len(out1.split())} words"
+    
+    out2, status2, score2, meta2 = "", "", "", ""
+    battle_note = ""
+    arena_vis = gr.update(visible=False)
+    
+    if is_arena:
+        arena_vis = gr.update(visible=True)
+        out2 = results[1]["res"]["transformed"]
+        status2 = f"✓ {results[1]['model']} · score: {results[1]['score']['overall']}/10"
+        score2 = format_score_for_ui(results[1]["score"]) + "\n\nREASONING:\n" + results[1]["score"]["breakdown"]["llm_judge"]["note"]
+        meta2 = f"{len(out2)} chars · {len(out2.split())} words"
+        
+        # Run battle judge
+        from scorer import judge_battle
+        battle = judge_battle(raw_prompt, out1, selected_models[0], out2, selected_models[1])
+        battle_note = f"🏆 WINNER: Version {battle['winner']} ({selected_models[0] if battle['winner']=='A' else selected_models[1]})\n\nWHY: {battle['reasoning']}"
+        
     return (
-        result["transformed"],
-        status,
-        exemplar_text,
-        full_score_text,
-        meta,
+        out1, status1, score1, 
+        out2, status2, score2, 
+        arena_vis, battle_note,
+        meta1, meta2
     )
 
 
@@ -291,139 +271,114 @@ button.secondary:hover { background: #efefed !important; transform: translateY(-
 """
 
 # ── UI ────────────────────────────────────────────────────────────────────────
-with gr.Blocks(title="Prompt Forge", css=CSS) as demo:
+with gr.Blocks(title="Prompt Forge Arena", css=CSS) as demo:
 
     # Header
     gr.Markdown("""
 <div class="pf-header">
-<div style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:500;color:#c4633e;background:white;border:0.5px solid #f0d0c0;padding:5px 14px;border-radius:20px;margin-bottom:18px;">⚡ RAG · 8,435 prompts</div>
-<h1 style="font-size:32px;font-weight:600;color:#1c1c1a;letter-spacing:-0.04em;line-height:1.18;margin-bottom:12px;font-family:'DM Sans',sans-serif;">Turn messy prompts into <span style="color:#c4633e;">model-ready instructions</span></h1>
-<p style="font-size:14px;color:#999;line-height:1.65;max-width:460px;margin:0 auto;font-family:'DM Sans',sans-serif;">RAG-powered prompt rewriting for Claude Code, GPT-4, Cursor, Gemini, and general use.</p>
+<div style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:500;color:#c4633e;background:white;border:0.5px solid #f0d0c0;padding:5px 14px;border-radius:20px;margin-bottom:18px;">⚡ Arena Mode · 8,435 prompts</div>
+<h1 style="font-size:32px;font-weight:600;color:#1c1c1a;letter-spacing:-0.04em;line-height:1.18;margin-bottom:12px;font-family:'DM Sans',sans-serif;">The Prompt <span style="color:#c4633e;">Arena</span></h1>
+<p style="font-size:14px;color:#999;line-height:1.65;max-width:460px;margin:0 auto;font-family:'DM Sans',sans-serif;">Compare model optimizations side-by-side. Select two models to trigger a Battle.</p>
 </div>
 """)
 
-    # Main two columns
-    with gr.Row(equal_height=False):
-
-        # Left — input
-        with gr.Column(scale=1, elem_classes="panel-card"):
-
+    # Input Section
+    with gr.Row(elem_classes="panel-card"):
+        with gr.Column(scale=2):
             raw_input = gr.Textbox(
                 label       = "Messy prompt",
-                placeholder = "Paste rough notes, a vague request, or a messy first draft...",
-                lines       = 16,
-                max_lines   = 24,
+                placeholder = "Paste your rough draft here...",
+                lines       = 6,
             )
-
-            with gr.Row():
-                model_dropdown = gr.Dropdown(
-                    choices = MODELS,
-                    value   = "general",
-                    label   = "Target model",
-                )
-                depth_dropdown = gr.Dropdown(
-                    choices = DEPTHS,
-                    value   = "standard",
-                    label   = "Depth",
-                )
-
-            forge_btn = gr.Button(
-                "⚡ Transform prompt",
-                variant = "primary",
-                size    = "lg",
+        with gr.Column(scale=1):
+            model_dropdown = gr.Dropdown(
+                choices     = MODELS,
+                value       = ["general"],
+                multiselect = True,
+                max_choices = 2,
+                label       = "Models (Select up to 2)",
             )
+            depth_dropdown = gr.Dropdown(
+                choices = DEPTHS,
+                value   = "standard",
+                label   = "Depth",
+            )
+            forge_btn = gr.Button("⚡ Forge & Battle", variant="primary")
 
-        # Right — output
+    # Battle Result Note
+    with gr.Row(visible=False) as arena_note_row:
+        battle_note = gr.Markdown(elem_classes="bottom-card")
+
+    # Main Arena Row
+    with gr.Row(equal_height=False):
+
+        # Column 1
         with gr.Column(scale=1, elem_classes="panel-card"):
-
-            status_display = gr.Textbox(
-                label       = "Status",
-                lines       = 1,
-                interactive = False,
-                elem_classes= "status-text",
-            )
-
-            output_display = gr.Textbox(
-                label       = "Structured prompt",
-                lines       = 16,
-                max_lines   = 24,
-                interactive = True,
-                elem_classes= "output-text",
-            )
-
-            output_meta = gr.Textbox(
-                label       = "",
-                lines       = 1,
-                interactive = False,
-                elem_classes= "meta-text",
-            )
-
+            status_1 = gr.Textbox(label="Version A Status", lines=1, interactive=False, elem_classes="status-text")
+            output_1 = gr.Textbox(label="Structured Prompt (A)", lines=16, interactive=True, elem_classes="output-text")
+            meta_1 = gr.Textbox(label="", lines=1, interactive=False, elem_classes="meta-text")
+            score_1 = gr.Textbox(label="A: Score & Reasoning", lines=6, interactive=False, elem_classes="score-text")
             with gr.Row():
-                copy_btn = gr.Button(
-                    "Copy",
-                    variant = "secondary",
-                    size    = "sm",
-                )
-                save_btn = gr.Button(
-                    "⭐ Save to Library",
-                    variant = "secondary",
-                    size    = "sm",
-                )
+                copy_btn_1 = gr.Button("Copy A", size="sm")
+                save_btn_1 = gr.Button("⭐ Save A", size="sm")
 
-    # Library Row
+        # Column 2 (Arena)
+        with gr.Column(scale=1, elem_classes="panel-card", visible=False) as col_2:
+            status_2 = gr.Textbox(label="Version B Status", lines=1, interactive=False, elem_classes="status-text")
+            output_2 = gr.Textbox(label="Structured Prompt (B)", lines=16, interactive=True, elem_classes="output-text")
+            meta_2 = gr.Textbox(label="", lines=1, interactive=False, elem_classes="meta-text")
+            score_2 = gr.Textbox(label="B: Score & Reasoning", lines=6, interactive=False, elem_classes="score-text")
+            with gr.Row():
+                copy_btn_2 = gr.Button("Copy B", size="sm")
+                save_btn_2 = gr.Button("⭐ Save B", size="sm")
+
+    # Library & Exemplars
     with gr.Row():
         with gr.Column(elem_classes="bottom-card"):
             with gr.Accordion("📚 Your Prompt Library", open=False):
-                library_status = gr.Markdown("No prompts saved yet. Forge and save some!")
-                library_list = gr.HTML("<div id='library-container'>Your library will appear here...</div>")
-
-    # Bottom row
-    with gr.Row(equal_height=True):
-        with gr.Column(scale=1, elem_classes="bottom-card"):
+                library_list = gr.HTML("<div id='library-container'>Loading...</div>")
+        
+        with gr.Column(elem_classes="bottom-card"):
             exemplar_display = gr.Textbox(
-                label       = "Matched exemplars",
-                lines       = 6,
+                label       = "Source Exemplars",
+                lines       = 5,
                 interactive = False,
                 elem_classes= "exemplar-text",
-            )
-
-        with gr.Column(scale=1, elem_classes="bottom-card"):
-            score_display = gr.Textbox(
-                label       = "Quality score & Reasoning",
-                lines       = 8,
-                interactive = False,
-                elem_classes= "score-text",
             )
 
     # Event handlers
     forge_btn.click(
         fn=forge,
         inputs=[raw_input, model_dropdown, depth_dropdown],
-        outputs=[output_display, status_display, exemplar_display, score_display, output_meta]
+        outputs=[
+            output_1, status_1, score_1, 
+            output_2, status_2, score_2, 
+            col_2, battle_note,
+            meta_1, meta_2
+        ]
     )
+    
+    battle_note.change(lambda x: gr.update(visible=bool(x)), inputs=battle_note, outputs=arena_note_row)
 
-    copy_btn.click(
-        fn=None,
-        inputs=output_display,
-        js="(v) => { navigator.clipboard.writeText(v); alert('Copied to clipboard!'); }"
-    )
+    copy_btn_1.click(fn=None, inputs=output_1, js="(v) => { navigator.clipboard.writeText(v); alert('Copied Version A!'); }")
+    copy_btn_2.click(fn=None, inputs=output_2, js="(v) => { navigator.clipboard.writeText(v); alert('Copied Version B!'); }")
 
-    save_btn.click(
-        fn=None,
-        inputs=[output_display, model_dropdown, status_display],
-        js="""
-        (prompt, model, status) => {
-            window.parent.postMessage({
+    def get_save_js(index):
+        return f"""
+        (prompt, model, status) => {{
+            window.parent.postMessage({{
                 type: 'savePrompt',
-                entry: {
+                entry: {{
                     prompt: prompt,
-                    model: model,
+                    model: model[0] || model,
                     status: status
-                }
-            }, '*');
-        }
+                }}
+            }}, '*');
+        }}
         """
-    )
+
+    save_btn_1.click(fn=None, inputs=[output_1, model_dropdown, status_1], js=get_save_js(1))
+    save_btn_2.click(fn=None, inputs=[output_2, model_dropdown, status_2], js=get_save_js(2))
 
     # Inject JS to handle messages from VS Code
     demo.load(None, None, None, js="""
@@ -460,15 +415,14 @@ with gr.Blocks(title="Prompt Forge", css=CSS) as demo:
                     html += "</div>";
                     container.innerHTML = html;
                     
-                    // Add global function for loading
                     window.loadFavorite = (id) => {
                         const entry = data.library.find(i => i.id === id);
                         if (entry) {
                             const textareas = document.querySelectorAll('textarea[data-testid="textbox"]');
-                            if (textareas.length > 1) {
-                                textareas[1].value = entry.prompt;
-                                textareas[1].dispatchEvent(new Event('input', { bubbles: true }));
-                                alert("Prompt loaded into 'Structured prompt' field.");
+                            if (textareas.length > 0) {
+                                textareas[0].value = entry.prompt;
+                                textareas[0].dispatchEvent(new Event('input', { bubbles: true }));
+                                alert("Prompt loaded into input field.");
                             }
                         }
                     };
