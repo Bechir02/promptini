@@ -284,6 +284,7 @@ REPOS = [
 # file had its own divergent keyword lists, so corpus labels disagreed with
 # query-time labels. Now there is a single source of truth.
 from core.tasks import detect_task_type
+from core.corpus_cache import CorpusCache
 
 
 # ── Quality scoring ───────────────────────────────────────────────────────────
@@ -342,13 +343,19 @@ def quality_score(text: str) -> float:
 
 
 # ── GitHub API helpers ────────────────────────────────────────────────────────
-def get_repo_tree(repo: str) -> list:
+def get_repo_tree(repo: str, etag: str | None = None) -> tuple[list, str | None, bool]:
+    """Return (tree, etag, not_modified). Sends a conditional request (C5)."""
     url      = f"https://api.github.com/repos/{repo}/git/trees/HEAD?recursive=1"
-    response = requests.get(url, headers=HEADERS)
+    headers  = dict(HEADERS)
+    if etag:
+        headers["If-None-Match"] = etag
+    response = requests.get(url, headers=headers)
+    if response.status_code == 304:
+        return [], etag, True
     if response.status_code == 200:
-        return response.json().get("tree", [])
+        return response.json().get("tree", []), response.headers.get("ETag"), False
     print(f"  ⚠️  Could not fetch tree for {repo}: {response.status_code}")
-    return []
+    return [], None, False
 
 
 def get_file_content(repo: str, path: str) -> str:
@@ -482,6 +489,7 @@ def parse_markdown_prompts(
 # ── Main fetch ────────────────────────────────────────────────────────────────
 def fetch_all_prompts() -> list:
     all_prompts = []
+    cache = CorpusCache()
 
     for repo_config in REPOS:
         repo         = repo_config["repo"]
@@ -490,7 +498,15 @@ def fetch_all_prompts() -> list:
         extensions   = repo_config["extensions"]
 
         print(f"\n📦 {repo}")
-        tree = get_repo_tree(repo)
+        tree, etag, unchanged = get_repo_tree(repo, cache.etag(repo))
+
+        if unchanged:
+            cached = cache.prompts(repo)
+            if cached is not None:
+                print(f"  ↻ unchanged — reusing {len(cached)} cached prompts.")
+                all_prompts.extend(cached)
+                continue
+            tree, etag, unchanged = get_repo_tree(repo)  # 304 but no cache: refetch
 
         if not tree:
             print(f"  Skipping.")
@@ -503,7 +519,7 @@ def fetch_all_prompts() -> list:
         ]
 
         print(f"  {len(files)} files found.")
-        repo_count = 0
+        repo_prompts = []
 
         for i, file_path in enumerate(files):
             content = get_file_content(repo, file_path)
@@ -511,29 +527,27 @@ def fetch_all_prompts() -> list:
                 continue
 
             if file_path.endswith(".csv"):
-                parsed = parse_csv_prompts(
-                    content, target_model, license, repo)
+                parsed = parse_csv_prompts(content, target_model, license, repo)
             elif file_path.endswith(".ipynb"):
-                parsed = parse_ipynb_prompts(
-                    content, target_model, license, repo, i)
+                parsed = parse_ipynb_prompts(content, target_model, license, repo, i)
             elif file_path.endswith(".json"):
-                parsed = parse_json_prompts(
-                    content, target_model, license, repo, i)
+                parsed = parse_json_prompts(content, target_model, license, repo, i)
             else:
-                parsed = parse_markdown_prompts(
-                    content, target_model, license, repo, file_path, i)
+                parsed = parse_markdown_prompts(content, target_model, license, repo, file_path, i)
 
-            all_prompts.extend(parsed)
-            repo_count += len(parsed)
+            repo_prompts.extend(parsed)
             time.sleep(0.25)
 
-        print(f"  → {repo_count} prompts")
+        print(f"  → {len(repo_prompts)} prompts")
+        cache.update(repo, etag, repo_prompts)
+        all_prompts.extend(repo_prompts)
 
+    cache.save()
     return all_prompts
 
 
 # ── Deduplicate ───────────────────────────────────────────────────────────────
-def deduplicate(prompts: list) -> list:
+def deduplicate(prompts: list, semantic: bool = False) -> list:
     seen   = set()
     unique = []
     for p in prompts:
@@ -541,6 +555,11 @@ def deduplicate(prompts: list) -> list:
         if key not in seen:
             unique.append(p)
             seen.add(key)
+    if semantic:
+        from core.dedup import dedupe_near  # stronger near-dup pass (C6, offline)
+        before = len(unique)
+        unique = dedupe_near(unique, key="prompt", threshold=0.9)
+        print(f"  semantic dedup: {before} → {len(unique)}")
     return unique
 
 
@@ -553,7 +572,8 @@ if __name__ == "__main__":
     fetched = fetch_all_prompts()
     print(f"\n✅ Fetched {len(fetched)} raw prompts.")
 
-    unique = deduplicate(fetched)
+    semantic = os.environ.get("PF_SEMANTIC_DEDUP", "").lower() in ("1", "true", "yes")
+    unique = deduplicate(fetched, semantic=semantic)
     print(f"✅ After dedup: {len(unique)} unique prompts.")
 
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:

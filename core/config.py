@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     # ── Paths ────────────────────────────────────────────────────────────────
     prompts_file: str = Field(default="prompts.json", alias="PF_PROMPTS_FILE")
     db_path: str = Field(default="lancedb_store", alias="PF_DB_PATH")
+    # For Derja/Arabic retrieval (A2), set PF_EMBEDDING_MODEL to a multilingual
+    # model, e.g. "BAAI/bge-m3" or "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2".
+    # Switching requires a one-time re-embed of the corpus (heavier on CPU).
     embedding_model: str = Field(
         default="BAAI/bge-small-en-v1.5", alias="PF_EMBEDDING_MODEL"
     )

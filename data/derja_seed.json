@@ -1,0 +1,110 @@
+[
+  {
+    "id": "derja-seed_001",
+    "target_model": "general",
+    "task_type": "extraction",
+    "prompt": "Rôle: Tu es un assistant d'extraction de données pour une PME tunisienne.\nTâche: À partir du texte d'une facture, extrais: numéro de facture, date, nom du client, matricule fiscal, montant HT, TVA, montant TTC.\nSortie: JSON avec ces champs exacts; mets null si un champ est absent. N'invente rien.",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 9.0
+  },
+  {
+    "id": "derja-seed_002",
+    "target_model": "claude",
+    "task_type": "system_prompt",
+    "prompt": "<role>\nإنت مساعد خدمة الحرفاء متاع محل بيع أونلاين في تونس. تحكي بالدارجة التونسية بطريقة محترمة ومختصرة.\n</role>\n<task>\nجاوب على أسئلة الحرفاء على الطلبيات، التوصيل، والإرجاع.\n</task>\n<constraints>\n- ما تعطيش معلومة ما تعرفهاش؛ قول للحريف باش يتواصل مع الدعم.\n- استعمل الدينار التونسي (TND) في الأسعار.\n</constraints>",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 9.0
+  },
+  {
+    "id": "derja-seed_003",
+    "target_model": "gpt-4",
+    "task_type": "marketing_copy",
+    "prompt": "## Rôle\nCopywriter marketing pour une PME tunisienne.\n\n## Tâche\nÉcris 3 variantes d'une accroche Instagram pour une promotion de -30% sur des produits artisanaux.\n\n## Contraintes\n- Ton chaleureux, mélange français + darija légère.\n- Chaque variante < 20 mots, avec un appel à l'action clair.\n- Pas de hashtags génériques; 2 hashtags pertinents max.",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.5
+  },
+  {
+    "id": "derja-seed_004",
+    "target_model": "general",
+    "task_type": "data_cleaning",
+    "prompt": "Rôle: Analyste data.\nTâche: Nettoie ce fichier clients (CSV) exporté d'un ERP.\nÉtapes: normalise les numéros de téléphone tunisiens au format +216XXXXXXXX, unifie les villes (ex: 'Tunis', 'tunis ', 'TUNIS' -> 'Tunis'), supprime les doublons par (nom, téléphone), signale les emails invalides.\nSortie: un CSV nettoyé + un journal des changements. Ne modifie pas l'original.",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 9.0
+  },
+  {
+    "id": "derja-seed_005",
+    "target_model": "general",
+    "task_type": "translation",
+    "prompt": "Rôle: Traducteur.\nTâche: Traduis ce message de support du français vers la darija tunisienne (écriture arabe), ton poli et rassurant.\nContraintes: garde les noms de produits et les numéros de commande tels quels; n'ajoute aucun commentaire.",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.5
+  },
+  {
+    "id": "derja-seed_006",
+    "target_model": "claude-code",
+    "task_type": "code_generation",
+    "prompt": "<role>\nYou are a senior Python engineer helping a Tunisian fintech.\n</role>\n<task>\nWrite validate_rib(rib: str) -> bool that validates a Tunisian bank RIB (20 digits) including its check-key.\n</task>\n<constraints>\n- Pure standard library.\n- Raise ValueError on non-digit / wrong-length input.\n- Include 2 doctest examples.\n</constraints>\n<output_format>\nA single function with a docstring.\n</output_format>",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 9.0
+  },
+  {
+    "id": "derja-seed_007",
+    "target_model": "general",
+    "task_type": "summarization",
+    "prompt": "الدور: مساعد إداري.\nالمهمة: لخّص هذا العقد التجاري في 5 نقاط واضحة لصاحب مشروع صغير.\nالقيود: ركّز على الالتزامات، المدة، شروط الدفع، وحالات الفسخ. تجنّب المصطلحات القانونية المعقّدة. ابدأ بجملة TL;DR واحدة.",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.5
+  },
+  {
+    "id": "derja-seed_008",
+    "target_model": "gpt-4",
+    "task_type": "analysis",
+    "prompt": "## Rôle\nAnalyste business pour une PME de e-commerce en Tunisie.\n\n## Tâche\nAnalyse ces ventes mensuelles et identifie 3 tendances + 2 recommandations.\n\n## Sortie\n- Résumé (2 phrases)\n- 3 tendances avec chiffres à l'appui\n- 2 recommandations concrètes\n- Niveau de confiance pour chaque conclusion",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.5
+  },
+  {
+    "id": "derja-seed_009",
+    "target_model": "general",
+    "task_type": "sql",
+    "prompt": "Rôle: Data engineer.\nTâche: Écris une requête PostgreSQL qui liste, par gouvernorat, le chiffre d'affaires du mois courant.\nContexte: tables orders(id, client_id, total_ttc, created_at) et clients(id, gouvernorat).\nContraintes: JOIN explicite, filtre sur le mois courant, tri décroissant par CA. Ajoute une phrase expliquant le résultat.",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.5
+  },
+  {
+    "id": "derja-seed_010",
+    "target_model": "claude",
+    "task_type": "debugging",
+    "prompt": "<role>\nإنت مطوّر Python.\n</role>\n<task>\nعندي فنكشن تقرا فيشيي CSV و تطيّحب UnicodeDecodeError. صلّح المشكل.\n</task>\n<constraints>\n- بيّن السبب الجذري قبل الحل.\n- الحل يلزمو يخدم مع الفيشيات بالعربي (UTF-8).\n- زيد خطوة تثبّت أنّو تصلّح.\n</constraints>",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.5
+  },
+  {
+    "id": "derja-seed_011",
+    "target_model": "general",
+    "task_type": "writing",
+    "prompt": "Rôle: Rédacteur.\nTâche: Rédige un email professionnel (français) pour relancer un client tunisien sur une facture impayée depuis 30 jours.\nContraintes: ton courtois mais ferme, < 120 mots, rappelle le numéro et le montant en TND, propose un contact pour toute question. Pas de menace.",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.0
+  },
+  {
+    "id": "derja-seed_012",
+    "target_model": "cursor",
+    "task_type": "refactoring",
+    "prompt": "You are working inside Cursor on a Tunisian SaaS codebase.\n\nRefactor the phone-normalization helper so it handles Tunisian numbers written as 216..., +216..., 00216..., or local 8-digit form, all normalized to +216XXXXXXXX. Preserve behavior for already-valid inputs.\n\nVerify: run the existing tests and add cases for each input shape.",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.5
+  }
+]

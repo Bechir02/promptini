@@ -16,3 +16,4 @@ embedding_cache.pkl
 
 # Desktop app scratch (sent-file copies)
 Claude outputs/
+.corpus_cache.json

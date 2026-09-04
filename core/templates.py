@@ -12,6 +12,8 @@ core.constants.MODELS / TASK_TYPES.
 
 from __future__ import annotations
 
+import os
+
 from .constants import MODELS, TASK_TYPES, OUTPUT_LANGUAGES, ALLOWED_LANGUAGES, DEFAULT_LANGUAGE
 
 REQUIRED_FORMAT_KEYS = ("format", "description", "example")
@@ -465,6 +467,41 @@ def validate_templates() -> list[str]:
             problems.append(f"LANGUAGE_GUIDANCE missing language: {lang}")
 
     return problems
+
+
+# ── Optional YAML overrides (B7) — edit prompts without touching Python ────────
+def apply_overrides(data: dict) -> None:
+    """Merge {output_formats, task_guidance, language_guidance} into live dicts."""
+    for model, entry in (data.get("output_formats") or {}).items():
+        if isinstance(entry, dict):
+            OUTPUT_FORMATS[model] = {**OUTPUT_FORMATS.get(model, {}), **entry}
+    for task, guide in (data.get("task_guidance") or {}).items():
+        if guide:
+            TASK_GUIDANCE[task] = guide
+    for lang, guide in (data.get("language_guidance") or {}).items():
+        if guide:
+            LANGUAGE_GUIDANCE[lang] = guide
+
+
+def load_yaml_overrides(path: str) -> dict:
+    """Load a YAML overrides file if present (and PyYAML is installed)."""
+    from pathlib import Path
+    p = Path(path)
+    if not p.exists():
+        return {}
+    try:
+        import yaml
+    except Exception:
+        return {}
+    try:
+        data = yaml.safe_load(p.read_text()) or {}
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+# Apply overrides at import if a templates file exists (default: templates.yaml).
+apply_overrides(load_yaml_overrides(os.environ.get("PF_TEMPLATES_FILE", "templates.yaml")))
 
 
 if __name__ == "__main__":
