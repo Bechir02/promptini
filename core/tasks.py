@@ -1,11 +1,12 @@
-"""Canonical task-type classifier (multilingual).
+# -*- coding: utf-8 -*-
+"""Canonical task-type classifier (multilingual + Tunisian Derja/Arabizi).
 
-Single implementation used by BOTH the live pipeline (rag.py) and the corpus
-builder (fetch_corpus.py). English keyword behavior is unchanged (locked by
-tests); French and Arabic/Derja keywords are added so Tunisian users writing in
-Derja, franco-arabe, or French get correctly-classified prompts too.
+Single implementation used by the live pipeline (rag.py) and the corpus builder
+(fetch_corpus.py). English keyword behavior is unchanged (locked by tests);
+French, Arabic (script) and Derja/Arabizi (Latin, franco-arabe) keywords are
+added so Tunisian users get correctly-classified prompts in any register.
 
-Kept dependency-free and pure so it is trivially testable.
+Pure and dependency-free (stdlib only) so it stays trivially testable.
 """
 
 from __future__ import annotations
@@ -22,9 +23,9 @@ _ARABIZI_MAP = {"3": "", "7": "", "9": "q", "2": "", "5": "kh", "8": "gh", "6": 
 def normalize_arabizi(text: str) -> str:
     """Light normalization of Latin-script Derja (Arabizi).
 
-    Lowercases, collapses elongations (``loool`` -> ``lool``) and maps the common
-    Arabizi digit-letters so franco-arabe still matches Latin keywords. This is a
-    heuristic aid, not a full transliteration.
+    Lowercases, collapses elongations (``loool`` -> ``lool``) and maps common
+    Arabizi digit-letters so franco-arabe still matches Latin keywords. Heuristic
+    aid, not a full transliteration.
     """
     t = text.lower()
     t = re.sub(r"(.)\1{2,}", r"\1\1", t)
@@ -41,14 +42,20 @@ def _normalize(text: str) -> str:
 
 
 def detect_task_type(raw_prompt: str) -> str:
-    """Classify a prompt into one of the known task types via keyword rules.
+    """Classify a prompt into a known task type via keyword rules.
 
-    Order matters: earlier branches win. Keywords span English, French and
-    Arabic/Derja. Returns ``"general"`` as fallback.
+    Order matters: earlier branches win. Keywords span English, French, Arabic
+    and Derja/Arabizi. Both the raw-normalized text and an Arabizi-normalized copy
+    are checked, so ``salla7`` / ``sala7`` style spellings still match.
+    Returns ``"general"`` as fallback.
     """
     p = _normalize(raw_prompt)
+    pa = normalize_arabizi(p)   # digit-folded copy for franco-arabe
 
-    if any(w in p for w in [
+    def has(words):
+        return any(w in p or w in pa for w in words)
+
+    if has([
         # en
         "extract", "pull out", "get fields", "fetch fields", "retrieve fields",
         "parse json", "parse xml", "pull the", "grab the fields",
@@ -56,10 +63,12 @@ def detect_task_type(raw_prompt: str) -> str:
         "extraire", "extrais", "extraction",
         # ar
         "استخرج", "استخراج", "جيب لي", "هات لي", "استخلص",
+        # derja/arabizi
+        "estakhrej", "estakhrejli", "5rejli", "kharrejli", "jibli", "hatli",
     ]):
         return "extraction"
 
-    if any(w in p for w in [
+    if has([
         # en
         "system prompt", "persona", "act as", "you are a", "build an agent",
         "make an agent", "create an agent", "design an agent",
@@ -67,10 +76,13 @@ def detect_task_type(raw_prompt: str) -> str:
         "tu es un", "comporte-toi", "agent qui", "assistant qui", "prompt systeme",
         # ar
         "برومبت", "شخصية", "تصرف ك", "انت مساعد", "اعمل ايجنت", "اصنع ايجنت", "صمم ايجنت",
+        # derja/arabizi
+        "na3mel agent", "a3mel agent", "3mel agent", "3malli agent", "agent bech",
+        "agent mte3", "chatbot", "bot bech",
     ]):
         return "system_prompt"
 
-    if any(w in p for w in [
+    if has([
         # en
         "review", "audit", "evaluate", "assess", "critique", "check for bugs",
         "check for issues", "check for errors", "monitor", "scan for", "look for issues",
@@ -78,10 +90,14 @@ def detect_task_type(raw_prompt: str) -> str:
         "revise", "reviser", "revue", "audite", "verifie", "verifier", "evalue",
         # ar
         "راجع", "مراجعة", "دقق", "افحص", "قيم", "تحقق من",
-    ]) and not any(w in p for w in ["fix", "debug", "corrige", "صلح", "صحح"]):
+        # derja/arabizi
+        "raja3", "raje3", "raja3li", "raj3li", "9ayem",
+    ]) and not has([
+        "fix", "debug", "corrige", "صلح", "صحح", "salla7", "sale7", "asle7",
+    ]):
         return "code_review"
 
-    if any(w in p for w in [
+    if has([
         # en
         "fix", "debug", "error", "bug", "issue", "broken", "crash", "exception",
         "not working", "fails",
@@ -89,32 +105,56 @@ def detect_task_type(raw_prompt: str) -> str:
         "corrige", "corriger", "debogue", "deboguer", "erreur", "plante", "ne marche pas",
         # ar
         "صلح", "صحح", "خطأ", "باڨ", "ما يخدمش", "تعطل", "ما يمشيش", "علاش ما",
-    ]) and not any(w in p for w in [
+        # derja/arabizi
+        "salla7", "sale7", "asle7", "salla7li", "ma yekhdemch", "ma yemchich",
+        "ma ykhdemch", "planti", "3andi bug", "3andi erreur",
+    ]) and not has([
         "review", "monitor", "check for", "agent", "scan", "راجع", "audite",
+        "raja3", "raje3",
     ]):
         return "debugging"
 
-    if any(w in p for w in [
-        "translate", "translation", "traduire", "traduis", "traduction",
+    if has([
+        # en
+        "translate", "translation",
+        # fr
+        "traduire", "traduis", "traduction",
+        # ar
         "ترجم", "ترجمة", "ترجملي",
+        # derja/arabizi
+        "7awel", "7awil", "7awelli", "7awilli", "tarjem", "tarjemli", "traji",
     ]):
         return "translation"
 
-    if any(w in p for w in [
-        "localize", "localise", "localization", "localisation", "localiser",
-        "adapt for", "adapt this for", "توطين", "اقلمة", "تعريب",
+    if has([
+        # en
+        "localize", "localise", "localization", "localisation", "adapt for", "adapt this for",
+        # fr
+        "localiser",
+        # ar
+        "توطين", "اقلمة", "تعريب",
+        # derja/arabizi
+        "2aqlem", "aqlem", "waten",
     ]):
         return "localization"
 
-    if any(w in p for w in [
+    if has([
+        # en
         "clean the data", "clean up the data", "data cleaning", "deduplicate",
-        "drop duplicates", "remove duplicates", "missing values", "impute",
-        "normalize the data", "nettoyer les donnees", "nettoyage des donnees",
-        "تنظيف البيانات", "نظف البيانات",
+        "drop duplicates", "remove duplicates", "duplicates", "missing values", "impute",
+        "normalize the data",
+        # fr
+        "nettoyer les donnees", "nettoyage des donnees", "nettoie les donnees",
+        "supprime les doublons", "doublons", "valeurs manquantes",
+        # ar
+        "تنظيف البيانات", "نظف البيانات", "احذف التكرارات", "القيم المفقودة",
+        # derja/arabizi
+        "naddaf el data", "naddaf data", "na77i el data", "na77i el duplicates",
+        "naddaf el donnees",
     ]):
         return "data_cleaning"
 
-    if any(w in p for w in [
+    if has([
         # en
         "refactor", "clean up", "improve", "optimize", "restructure", "simplify",
         "rewrite", "dry", "boilerplate", "modularize", "decouple",
@@ -123,12 +163,15 @@ def detect_task_type(raw_prompt: str) -> str:
         "simplifie", "reecris", "reecrire",
         # ar
         "نظف", "حسن", "بسط", "اعد كتابة", "اعادة هيكلة", "ريفاكتور",
+        # derja/arabizi
+        "na9es el complexite", "naddaf el code", "bassat", "2a99el", "na9esli",
+        "sa77a7 el code",
     ]):
         return "refactoring"
 
     # Summarization before documentation (the word "document" would shadow
     # "summarize this document").
-    if any(w in p for w in [
+    if has([
         # en
         "summarize", "summary", "tldr", "brief", "overview", "recap", "condense",
         "main points", "key takeaways", "gist", "abstract",
@@ -136,55 +179,75 @@ def detect_task_type(raw_prompt: str) -> str:
         "resume", "resumer", "synthese", "synthetise", "en bref",
         # ar
         "لخص", "تلخيص", "اختصر", "ملخص", "باختصار", "اهم النقاط",
+        # derja/arabizi
+        "lakhes", "lkhes", "lakhesli", "lkhesli", "rakhesli", "2ossor", "2osorli",
     ]):
         return "summarization"
 
-    if any(w in p for w in [
+    if has([
         # en
         "document", "docs", "docstring", "readme", "comment", "explain this code",
         # fr
         "documente", "documentation", "commente", "explique le code",
         # ar
         "وثق", "توثيق", "اشرح الكود", "تعليقات",
+        # derja/arabizi
+        "fassar", "fasser", "fassarli", "echrah el code", "echrahli", "chrahli el code",
+        "commenti",
     ]):
         return "documentation"
 
-    if any(w in p for w in [
+    if has([
         # en
         "analyze", "analysis", "compare", "research", "investigate", "study", "examine",
         # fr
-        "analyse", "analyser", "compare", "comparer", "etudie", "etudier", "examine",
+        "analyse", "analyser", "comparer", "etudie", "etudier",
         # ar
-        "حلل", "تحليل", "قارن", "ادرس", "ابحث", "افحص",
+        "صلل", "تحليل", "قارن", "ادرس", "ابحث",
+        # derja/arabizi
+        "7alel", "7allel", "7allili", "9aren", "9arenli", "dros",
     ]):
         return "analysis"
 
-    if any(w in p for w in [
-        "marketing copy", "ad copy", "advert", "advertisement", "slogan",
-        "tagline", "landing page copy", "call to action", "product description",
-        "publicite", "annonce publicitaire", "وصف منتج", "اعلان", "شعار",
-    ]):
-        return "marketing_copy"
-
-    if any(w in p for w in [
+    if has([
         # en
-        "story", "essay", "blog post", "article", "creative", "poem", "write about",
-        "draft a", "composing", "narrative", "script a",
-        # fr
-        "ecris", "ecrire", "redige", "rediger", "redaction", "essai", "histoire",
-        "poeme", "article de blog",
-        # ar
-        "اكتب مقال", "قصة", "مقال", "انشئ نص", "تدوينة", "قصيدة",
-    ]):
-        return "writing"
-
-    if any(w in p for w in [
         "sql", "sql query", "select from", "select * from", "joins", "jointure",
-        "requete sql", "قاعدة بيانات", "استعلام",
+        # fr
+        "requete sql", "requete",
+        # ar
+        "قاعدة بيانات", "استعلام",
+        # derja/arabizi
+        "sql query", "base de donnees",
     ]):
         return "sql"
 
-    if any(w in p for w in [
+    if has([
+        # en
+        "marketing copy", "ad copy", "advert", "advertisement", "slogan", "tagline",
+        "landing page copy", "call to action", "product description",
+        # fr
+        "publicite", "annonce publicitaire", "texte marketing",
+        # ar
+        "وصف منتج", "اعلان", "شعار", "نص تسويقي",
+        # derja/arabizi
+        "chi3ar", "e3lan", "publicite mte3",
+    ]):
+        return "marketing_copy"
+
+    if has([
+        # en
+        "story", "essay", "blog post", "article", "creative", "poem", "write about",
+        "draft a", "composing", "narrative", "script a",
+        # fr  (note: bare "ecris/ecrire" removed — too broad, collided with code)
+        "redige", "rediger", "redaction", "essai", "histoire", "poeme", "article de blog",
+        # ar
+        "اكتب مقال", "قصة", "مقال", "انشئ نص", "تدوينة", "قصيدة",
+        # derja/arabizi
+        "ekteb maqal", "kteb maqal", "ekteb article", "9essa",
+    ]):
+        return "writing"
+
+    if has([
         # en
         "write", "create", "build", "implement", "generate", "code", "function",
         "class", "script", "program", "develop",
@@ -193,6 +256,9 @@ def detect_task_type(raw_prompt: str) -> str:
         "implemente", "implementer", "developpe", "developper",
         # ar
         "اكتب كود", "اعمل فنكشن", "برمج", "انشئ", "ولد", "سكريبت", "دالة", "كلاس",
+        # derja/arabizi
+        "3malli", "3melli", "a3melli", "aktebli code", "ekteb code", "kteb fonction",
+        "na3mel fonction", "code python",
     ]):
         return "code_generation"
 
