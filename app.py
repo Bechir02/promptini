@@ -54,7 +54,7 @@ def _begin(raw_prompt: str, target_models: list[str]):
     )
 
 
-def forge(raw_prompt: str, target_models: list[str], depth: str, language: str = "english", request: gr.Request | None = None):
+def forge(raw_prompt: str, target_models: list[str], depth: str, language: str = "english", chain: bool = False, request: gr.Request | None = None):
     if not raw_prompt or not raw_prompt.strip():
         return _empty_return(EMPTY_PROMPT_MSG)
     if not target_models:
@@ -69,7 +69,7 @@ def forge(raw_prompt: str, target_models: list[str], depth: str, language: str =
     is_arena = len(selected_models) > 1
 
     def _run_one(model_name: str) -> dict:
-        res = run_pipeline(raw_prompt=raw_prompt, target_model=model_name, depth=depth, language=language)
+        res = run_pipeline(raw_prompt=raw_prompt, target_model=model_name, depth=depth, language=language, chain=chain)
         score_res = score_transformation(raw_prompt, res["transformed"], model_name, res["task_type"])
         return {"res": res, "score": score_res, "model": model_name}
 
@@ -383,6 +383,7 @@ with gr.Blocks(title="Prompt Forge Arena", css=CSS) as demo:
                 value   = "english",
                 label   = "Output language",
             )
+            chain_toggle = gr.Checkbox(value=False, label="Decompose into steps (chain)")
             forge_btn = gr.Button("⚡ Forge & Battle", variant="primary")
 
     # Battle Result Note
@@ -435,7 +436,7 @@ with gr.Blocks(title="Prompt Forge Arena", css=CSS) as demo:
         outputs=[status_1, status_2, col_2, arena_note_row],
     ).then(
         fn=forge,
-        inputs=[raw_input, model_dropdown, depth_dropdown, language_dropdown],
+        inputs=[raw_input, model_dropdown, depth_dropdown, language_dropdown, chain_toggle],
         outputs=[
             output_1, status_1, score_1,
             output_2, status_2, score_2,

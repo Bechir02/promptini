@@ -6,7 +6,7 @@ from groq import Groq
 from cerebras.cloud.sdk import Cerebras
 
 from core.config import get_settings
-from core.templates import OUTPUT_FORMATS, TASK_GUIDANCE, ANTI_GENERIC, DERJA_INPUT_NOTE, build_language_block
+from core.templates import OUTPUT_FORMATS, TASK_GUIDANCE, ANTI_GENERIC, DERJA_INPUT_NOTE, build_language_block, CHAIN_DIRECTIVE
 
 logger = logging.getLogger(__name__)
 _settings = get_settings()
@@ -112,11 +112,13 @@ def build_system_prompt(
     depth:        str,
     exemplars:    list[dict],
     language:     str = "english",
+    chain:        bool = False,
 ) -> str:
 
     fmt        = OUTPUT_FORMATS.get(target_model, OUTPUT_FORMATS["general"])
     task_guide = TASK_GUIDANCE.get(task_type, TASK_GUIDANCE["general"])
     language_block = build_language_block(language)
+    chain_block = ("\n" + CHAIN_DIRECTIVE + "\n") if chain else ""
 
     depth_guidance = {
         "concise": (
@@ -169,6 +171,7 @@ EXAMPLE of correct format for {target_model}:
 
 ━━━ DEPTH REQUIREMENT ━━━
 {depth_guidance}
+{chain_block}
 
 ━━━ QUALITY RULES ━━━
 1. Every section must earn its place — if it adds no value, cut it
@@ -243,6 +246,7 @@ def transform_prompt(
     depth:        str,
     exemplars:    list[dict],
     language:     str = "english",
+    chain:        bool = False,
 ) -> tuple[str, str, dict]:
     """
     Returns (transformed_prompt, provider_name, usage_dict).
@@ -254,6 +258,7 @@ def transform_prompt(
         depth        = depth,
         exemplars    = exemplars,
         language     = language,
+        chain        = chain,
     )
     user_message = f"Raw prompt to transform:\n\n{raw_prompt}"
 

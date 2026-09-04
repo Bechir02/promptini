@@ -384,6 +384,12 @@ TASK_GUIDANCE: dict[str, str] = {
 }
 
 # ── Anti-generic rules ────────────────────────────────────────────────────────
+CHAIN_DIRECTIVE = """━━━ CHAIN MODE ━━━
+Do NOT produce a single prompt. Instead decompose the task into an ordered chain
+of 2–5 self-contained sub-prompts. Number them "Step 1:", "Step 2:", … Each step
+must be runnable on its own, state what it consumes (including the previous step's
+output) and what it produces, and keep the target-model format."""
+
 ANTI_GENERIC = """
 WHAT TO AVOID — these make prompts weak:
 - Vague words: "good", "nice", "appropriate", "proper", "clear", "relevant"

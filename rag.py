@@ -22,6 +22,7 @@ def run_pipeline(
     target_model: str = "general",
     depth:        str = "standard",
     language:     str = DEFAULT_LANGUAGE,
+    chain:        bool = False,
     top_k:        int = 3,
 ) -> dict:
 
@@ -33,7 +34,7 @@ def run_pipeline(
         depth = DEFAULT_DEPTH
     language = normalize_language(language)
 
-    cache_key = (raw_prompt, target_model, depth, language, top_k)
+    cache_key = (raw_prompt, target_model, depth, language, chain, top_k)
     cached = _PIPELINE_CACHE.get(cache_key)
     if cached is not None:
         logger.info("Pipeline cache hit.")
@@ -64,6 +65,7 @@ def run_pipeline(
             depth        = depth,
             exemplars    = exemplars,
             language     = language,
+            chain        = chain,
         )
         elapsed = time.perf_counter() - start_time
         logger.info("Done — provider: %s | %.2fs", provider, elapsed)
