@@ -280,71 +280,10 @@ REPOS = [
 ]
 
 # ── Task type detection ───────────────────────────────────────────────────────
-def detect_task_type(text: str) -> str:
-    t = text.lower()
-
-    if any(w in t for w in [
-        "extract", "pull out", "parse json", "get fields",
-        "retrieve fields", "grab the", "pull the fields",
-    ]):
-        return "extraction"
-
-    if any(w in t for w in [
-        "system prompt", "persona", "act as", "you are a",
-        "build an agent", "make an agent", "create an agent",
-    ]):
-        return "system_prompt"
-
-    if any(w in t for w in [
-        "review", "audit", "check for bugs", "scan for",
-        "look for issues", "evaluate the code",
-    ]) and not any(w in t for w in ["fix", "debug"]):
-        return "code_review"
-
-    if any(w in t for w in [
-        "fix", "debug", "error", "bug", "not working",
-        "broken", "crash", "exception", "fails",
-    ]) and not any(w in t for w in ["review", "monitor", "agent"]):
-        return "debugging"
-
-    if any(w in t for w in [
-        "refactor", "clean up", "optimize", "restructure",
-        "simplify", "rewrite", "improve the code",
-    ]):
-        return "refactoring"
-
-    if any(w in t for w in [
-        "document", "docstring", "readme", "explain this code",
-        "add comments", "write docs",
-    ]):
-        return "documentation"
-
-    if any(w in t for w in [
-        "analyze", "analysis", "compare", "research",
-        "investigate", "examine", "study",
-    ]):
-        return "analysis"
-
-    if any(w in t for w in [
-        "summarize", "summary", "tldr", "overview",
-        "condense", "recap",
-    ]):
-        return "summarization"
-
-    if any(w in t for w in [
-        "story", "essay", "blog post", "article",
-        "creative", "poem", "write about",
-    ]):
-        return "writing"
-
-    if any(w in t for w in [
-        "write", "create", "build", "implement",
-        "generate", "code", "function", "class",
-        "script", "program", "develop",
-    ]):
-        return "code_generation"
-
-    return "general"
+# Canonical classifier shared with the live pipeline (rag.py). Previously this
+# file had its own divergent keyword lists, so corpus labels disagreed with
+# query-time labels. Now there is a single source of truth.
+from core.tasks import detect_task_type
 
 
 # ── Quality scoring ───────────────────────────────────────────────────────────

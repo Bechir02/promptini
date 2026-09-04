@@ -1,282 +1,19 @@
-import os
+import logging
 from dotenv import load_dotenv
 load_dotenv()
 from groq import Groq
 from cerebras.cloud.sdk import Cerebras
 
-# ── API Keys ──────────────────────────────────────────────────────────────────
-GROQ_API_KEY     = os.environ.get("GROQ_API_KEY", "")
-CEREBRAS_API_KEY = os.environ.get("CEREBRAS_API_KEY", "")
+from core.config import get_settings
+from core.templates import OUTPUT_FORMATS, TASK_GUIDANCE, ANTI_GENERIC
 
-# ── Model config ──────────────────────────────────────────────────────────────
-GROQ_MODEL     = "llama-3.3-70b-versatile"
-CEREBRAS_MODEL = "llama3.1-8b"
+logger = logging.getLogger(__name__)
+_settings = get_settings()
 
-# ── Output format per model ───────────────────────────────────────────────────
-OUTPUT_FORMATS = {
-    "claude-code": {
-        "format":      "xml",
-        "description": "XML tags only — <role>, <task>, <context>, <constraints>, <output_format>. No markdown headers. No bullet points outside tags.",
-        "example": """<role>
-You are a senior Python engineer working inside Claude Code.
-</role>
-<task>
-Implement a CSV duplicate finder that returns a DataFrame of duplicate rows with counts.
-</task>
-<context>
-- File path: {csv_path}
-- Expected columns: {columns}
-</context>
-<constraints>
-- Use pandas for all operations
-- Handle encoding errors gracefully
-- Return empty DataFrame if no duplicates found
-- Do not modify the original file
-</constraints>
-<output_format>
-DataFrame with columns: ['duplicate_row', 'count']
-Followed by a one-line summary: "Found X duplicate rows."
-</output_format>""",
-    },
-
-    "claude": {
-        "format":      "xml",
-        "description": "XML tags — <role>, <task>, <context>, <constraints>, <output_format>. Clear role. Explicit output format. Step-by-step reasoning for complex tasks.",
-        "example": """<role>
-You are an expert data analyst.
-</role>
-<task>
-Analyze the provided dataset and identify the top 3 trends.
-</task>
-<context>
-- Dataset: {dataset_path}
-- Time period: {time_period}
-</context>
-<constraints>
-- Cite specific data points for each trend
-- Avoid speculation beyond the data
-- Use plain language suitable for non-technical stakeholders
-</constraints>
-<output_format>
-Three numbered trends, each with: trend name, supporting data, business implication.
-</output_format>""",
-    },
-
-    "gpt-4": {
-        "format":      "markdown",
-        "description": "Markdown headers only — ## Role, ## Task, ## Instructions, ## Output Format. No XML tags. Instructions as numbered list.",
-        "example": """## Role
-You are a senior Python engineer.
-
-## Task
-Build a CSV duplicate finder that returns duplicate rows with their counts.
-
-## Instructions
-1. Accept a file path as input
-2. Load the CSV using pandas
-3. Identify all duplicate rows
-4. Return a DataFrame with columns: duplicate_row, count
-
-## Output Format
-- A pandas DataFrame
-- Print summary: "Found X duplicate rows."
-- Raise ValueError if file not found""",
-    },
-
-    "cursor": {
-        "format":      "minimal",
-        "description": "Minimal, action-first. No headers, no XML. Short paragraphs. One clear task per sentence. You are working inside Cursor IDE. End with a concrete verification step.",
-        "example": """You are working inside Cursor IDE on a Python project.
-
-Find all duplicate rows in {csv_path} using pandas. Return a DataFrame with columns duplicate_row and count. Handle missing files with a clear error message.
-
-Verify: run the function on a test CSV with known duplicates and confirm the output matches.""",
-    },
-
-    "gemini": {
-        "format":      "numbered",
-        "description": "Role statement, then numbered steps, then explicit output section. No XML. Clean and direct. Put the most important instruction at the end.",
-        "example": """You are a data processing assistant specialized in Python and pandas.
-
-Task: Find duplicate rows in a CSV file and return them with counts.
-
-Steps:
-1. Load the CSV from {csv_path} using pandas
-2. Identify all fully duplicate rows
-3. Count occurrences of each duplicate
-4. Return results as a DataFrame
-
-Output: DataFrame with columns [duplicate_row, count]. Print "Found X duplicate rows." as summary.
-
-Edge cases: empty file returns empty DataFrame, missing file raises ValueError.""",
-    },
-
-    "llama": {
-        "format":      "structured",
-        "description": "Clear role at top. Numbered steps for sequential tasks. Explicit constraints list. Output format section. Direct and explicit — Llama models respond well to clear delimiters.",
-        "example": """Role: You are a Python data engineer.
-
-Task: Find all duplicate rows in a CSV file and return them with occurrence counts.
-
-Steps:
-1. Accept file path as input parameter
-2. Load CSV using pandas read_csv
-3. Identify fully duplicate rows using duplicated()
-4. Count occurrences and return as DataFrame
-
-Constraints:
-- Use only pandas and standard library
-- Handle FileNotFoundError explicitly
-- Do not modify the input file
-
-Output: DataFrame with columns [duplicate_row, count] plus summary string.""",
-    },
-
-    "mistral": {
-        "format":      "markdown",
-        "description": "Markdown headers for structure. Direct and concise. Clear delimiters between sections. Specify output format explicitly.",
-        "example": """## Role
-Python data engineer specializing in data quality.
-
-## Task
-Find duplicate rows in a CSV file and return them with counts.
-
-## Requirements
-- Input: file path as string
-- Use pandas for all operations
-- Return DataFrame with columns: duplicate_row, count
-- Raise ValueError for missing files
-
-## Output Format
-DataFrame + one-line summary: "Found X duplicates." """,
-    },
-
-    "copilot": {
-        "format":      "minimal",
-        "description": "Code-focused and file-aware. Reference specific files, functions, line numbers. Action-oriented. One task at a time. Always specify the programming language.",
-        "example": """Language: Python
-
-In the file {file_path}, implement a function called find_duplicates(csv_path: str) -> pd.DataFrame.
-
-The function should read the CSV, find all duplicate rows, and return them with occurrence counts as a DataFrame with columns [duplicate_row, count].
-
-Handle FileNotFoundError. Do not modify existing functions in the file.""",
-    },
-
-    "general": {
-        "format":      "structured",
-        "description": "Clear sections with bold headers. Role, Task, Context, Constraints, Output Format. Readable and model-agnostic.",
-        "example": """**Role:** You are a Python data engineer.
-
-**Task:** Find duplicate rows in a CSV file and return them with occurrence counts.
-
-**Context:** Input is a CSV file at {csv_path}. Caller expects a pandas DataFrame back.
-
-**Constraints:**
-- Use pandas only
-- Handle missing files gracefully
-- Do not modify the input file
-
-**Output Format:** DataFrame with columns [duplicate_row, count] plus a summary string.""",
-    },
-}
-
-# ── Task-specific guidance ────────────────────────────────────────────────────
-TASK_GUIDANCE = {
-    "code_generation": """
-- Specify the exact function/class signature expected
-- List input types and output types explicitly
-- Include error handling requirements
-- Mention performance constraints if relevant
-- Add at least one concrete usage example
-""",
-    "debugging": """
-- ALWAYS include these four elements — no exceptions:
-  1. The exact error message or exception type
-  2. Root cause analysis BEFORE any fix is proposed
-  3. The concrete fix with corrected code
-  4. Prevention strategy for this class of bug
-- Keep scope narrow — fix this specific bug only
-- End with a concrete verification step
-- Use the words: error, root cause, fix, prevent
-""",
-    "code_review": """
-- Define review criteria explicitly (security, performance, style, correctness)
-- Specify severity levels (critical / warning / suggestion)
-- Ask for positive observations too
-- Set scope — what NOT to review
-- Request actionable fixes, not just observations
-""",
-    "refactoring": """
-- State the refactoring goal precisely (e.g., reduce cognitive complexity, improve DRY, add type hints)
-- Explicitly require: preserve all existing behavior and pass all current tests
-- Ask for a "Before/After" comparison table or summary
-- Limit scope — focus on one architectural concern at a time
-- Request an explanation of EACH pattern applied (e.g., "Extracted Method", "Replaced Magic Number")
-- Require that no new dependencies be added unless specified
-""",
-    "documentation": """
-- Specify doc format (docstring / JSDoc / README / inline)
-- Define the audience
-- List what must be covered (params, returns, exceptions, examples)
-- Specify length constraints
-- Ask for usage examples
-""",
-    "analysis": """
-- Define what "interesting" means — patterns, anomalies, trends
-- Specify output structure (summary + findings + recommendations)
-- Ask for confidence levels on conclusions
-- Request that assumptions be stated explicitly
-- Define the audience
-""",
-    "extraction": """
-- List every field to extract with its expected type
-- Specify null handling explicitly
-- Prohibit hallucination
-- Define output format (JSON schema preferred)
-- Handle edge cases: nested fields, arrays, ambiguous values
-""",
-    "summarization": """
-- Specify target length EXACTLY (e.g., "between 100 and 150 words" or "3-5 bullet points")
-- Define what "Key Information" must be preserved (e.g., names, dates, core argument)
-- Define what to exclude (e.g., examples, preamble, meta-commentary)
-- Specify the reading level (e.g., "Grade 10", "Executive Summary", "Layperson")
-- Prohibit generic openings like "This document discusses..." or "The text covers..."
-- Ask for a "TL;DR" one-liner at the very top
-""",
-    "system_prompt": """
-- Define the persona with specific traits, not generic ones
-- List behavioral rules as explicit do/don't pairs
-- Define the scope boundary — what topics are in/out
-- Specify tone with concrete adjectives
-- Add an out-of-scope redirect behavior
-""",
-    "writing": """
-- Specify genre, tone, and target audience with descriptive adjectives (e.g., "Professional yet witty", "Technical but accessible")
-- Define length in word count range
-- List stylistic constraints (e.g., "No passive voice", "Use short paragraphs", "Include a punchy headline")
-- Prohibit meta-commentary — do not talk about the writing, just WRITE
-- Give one concrete example of the desired style and one example of a style to avoid
-- Specify the perspective (1st person, 3rd person objective, etc.)
-""",
-    "general": """
-- Make the task as specific as possible
-- Add at least one concrete constraint
-- Define the output format explicitly
-- Specify what success looks like
-""",
-}
-
-# ── Anti-generic rules ────────────────────────────────────────────────────────
-ANTI_GENERIC = """
-WHAT TO AVOID — these make prompts weak:
-- Vague words: "good", "nice", "appropriate", "proper", "clear", "relevant"
-- Redundant phrases: "please", "if possible", "as needed", "when applicable"
-- Obvious instructions: "make sure it works", "test your code", "be accurate"
-- Copying exemplar text verbatim
-- Adding sections that add no value for this specific task
-"""
-
+# ── Provider routing ──────────────────────────────────────────────────────────
+# Only Groq (primary) and Cerebras (fallback) are supported, by design.
+GROQ_MODEL     = _settings.groq_model
+CEREBRAS_MODEL = _settings.cerebras_model
 
 # ── Build system prompt ───────────────────────────────────────────────────────
 def build_system_prompt(
@@ -359,19 +96,19 @@ EXAMPLE of correct format for {target_model}:
 
 
 # ── Groq call ─────────────────────────────────────────────────────────────────
-def call_groq(system_prompt: str, user_prompt: str) -> tuple[str, dict]:
-    if not GROQ_API_KEY:
+def call_groq(system_prompt: str, user_prompt: str, model: str | None = None) -> tuple[str, dict]:
+    if not _settings.groq_api_key:
         raise ValueError("GROQ_API_KEY not set.")
 
-    client   = Groq(api_key=GROQ_API_KEY)
+    client   = Groq(api_key=_settings.groq_api_key)
     response = client.chat.completions.create(
-        model    = GROQ_MODEL,
+        model    = model or GROQ_MODEL,
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": user_prompt},
         ],
-        max_tokens  = 1500,
-        temperature = 0.4,
+        max_tokens  = _settings.max_tokens,
+        temperature = _settings.temperature,
     )
     usage = {
         "prompt_tokens":     response.usage.prompt_tokens,
@@ -382,18 +119,18 @@ def call_groq(system_prompt: str, user_prompt: str) -> tuple[str, dict]:
 
 
 # ── Cerebras fallback ─────────────────────────────────────────────────────────
-def call_cerebras(system_prompt: str, user_prompt: str) -> tuple[str, dict]:
-    if not CEREBRAS_API_KEY:
+def call_cerebras(system_prompt: str, user_prompt: str, model: str | None = None) -> tuple[str, dict]:
+    if not _settings.cerebras_api_key:
         raise ValueError("CEREBRAS_API_KEY not set.")
 
-    client   = Cerebras(api_key=CEREBRAS_API_KEY)
+    client   = Cerebras(api_key=_settings.cerebras_api_key)
     response = client.chat.completions.create(
-        model    = CEREBRAS_MODEL,
+        model    = model or CEREBRAS_MODEL,
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": user_prompt},
         ],
-        max_tokens = 1500,
+        max_tokens = _settings.max_tokens,
     )
     usage = {
         "prompt_tokens":     getattr(response.usage, "prompt_tokens", 0),
@@ -425,13 +162,13 @@ def transform_prompt(
 
     try:
         result, usage = call_groq(system_prompt, user_message)
-        return result, "Groq (llama-3.3-70b)", usage
+        return result, f"Groq ({GROQ_MODEL})", usage
     except Exception as e:
-        print(f"Groq failed: {e} — falling back to Cerebras...")
+        logger.warning("Groq failed: %s — falling back to Cerebras...", e)
 
     try:
         result, usage = call_cerebras(system_prompt, user_message)
-        return result, "Cerebras (llama3.1-8b)", usage
+        return result, f"Cerebras ({CEREBRAS_MODEL})", usage
     except Exception as e:
         raise RuntimeError(
             f"Both Groq and Cerebras failed.\n"
@@ -440,15 +177,42 @@ def transform_prompt(
         )
 
 
+def _route_model(model: str | None) -> tuple[str, str | None]:
+    """Parse a model spec into (provider, model_name).
+
+    Accepts ``None``/``"groq"``/``"cerebras"`` or a ``"provider/model"`` form
+    such as ``"groq/llama-3.3-70b-versatile"``. Unknown providers default to
+    Groq. Returns the explicit model name (or None to use the provider default).
+    """
+    if not model:
+        return "groq", None
+    spec = model.strip().lower()
+    provider, _, name = spec.partition("/")
+    if provider not in ("groq", "cerebras"):
+        # No provider prefix — treat the whole thing as a provider keyword.
+        return ("cerebras" if provider == "cerebras" else "groq"), None
+    return provider, (name or None)
+
+
 def call_llm(prompt: str, model: str = "groq", response_format: str = "text") -> str:
-    """Unified helper used by scorer.py for LLM-as-a-Judge evaluations."""
+    """Unified helper used by scorer.py for LLM-as-a-Judge evaluations.
+
+    Honors the requested ``model`` (provider and optional model name) and still
+    falls back to the other provider on failure.
+    """
     system = "You are a helpful assistant."
     if "json" in response_format:
         system += " You must respond in valid JSON format."
 
+    provider, model_name = _route_model(model)
+    primary, secondary = (
+        (call_groq, call_cerebras) if provider == "groq" else (call_cerebras, call_groq)
+    )
+
     try:
-        res, _ = call_groq(system, prompt)
+        res, _ = primary(system, prompt, model=model_name)
         return res
-    except Exception:
-        res, _ = call_cerebras(system, prompt)
+    except Exception as e:
+        logger.warning("Primary provider (%s) failed: %s — trying fallback.", provider, e)
+        res, _ = secondary(system, prompt)
         return res

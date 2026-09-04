@@ -1,7 +1,7 @@
 import re
-import os
 import json
 from llm import call_groq, call_cerebras
+from core.constants import SCORE_WEIGHTS
 
 # ── Vague words ───────────────────────────────────────────────────────────────
 VAGUE_WORDS = [
@@ -254,7 +254,9 @@ def judge_battle(raw_prompt: str, output_a: str, model_a: str, output_b: str, mo
     
     try:
         from llm import call_llm
-        response = call_llm(prompt, model="groq/llama-3.1-70b-versatile", response_format="json")
+        # Use the configured Groq model (previously hard-coded to a non-existent
+        # "llama-3.1-70b-versatile" string that call_llm also ignored).
+        response = call_llm(prompt, model="groq", response_format="json")
         import json
         return json.loads(response)
     except Exception as e:
@@ -324,14 +326,10 @@ def score_transformation(
     improvement = score_improvement(raw_prompt, output)
     llm_judge   = score_with_llm(raw_prompt, output, target_model, task_type)
 
-    weights = {
-        "structure":   0.20,
-        "specificity": 0.20,
-        "model_aware": 0.15,
-        "task_cover":  0.15,
-        "improvement": 0.05,
-        "llm_judge":   0.25,
-    }
+    # Heuristic checks are cheap lint signals (kept low-weight so keyword
+    # stuffing can't dominate); the rubric-driven LLM judge carries the most
+    # weight. Defined once in core.constants.
+    weights = SCORE_WEIGHTS
 
     overall = (
         structure["score"]   * weights["structure"]   +
@@ -381,3 +379,72 @@ def format_score_for_ui(score_result: dict) -> str:
         f"Human-grade   {b['llm_judge']['score']:4.1f}/10  — {b['llm_judge']['note']}",
     ]
     return "\n".join(lines)
+
+
+# ── HTML score card (used by the redesigned UI) ───────────────────────────────
+_GRADE_COLOR = {
+    "A": "var(--pf-good)",
+    "B": "var(--pf-good)",
+    "C": "var(--pf-warn)",
+    "D": "var(--pf-warn)",
+    "F": "var(--pf-bad)",
+}
+
+
+def _bar_color(score: float) -> str:
+    if score >= 7.5:
+        return "var(--pf-good)"
+    if score >= 5.0:
+        return "var(--pf-warn)"
+    return "var(--pf-bad)"
+
+
+def _esc(text: str) -> str:
+    return (
+        str(text)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+
+
+def format_score_html(score_result: dict, reasoning: str = "") -> str:
+    """Render a compact score card: grade chip + per-dimension bars + reasoning."""
+    s = score_result
+    b = s["breakdown"]
+    grade_letter = s["grade"].split(" ")[0]
+    grade_col = _GRADE_COLOR.get(grade_letter, "var(--pf-warn)")
+
+    rows = [
+        ("Structure",     b["structure"]["score"]),
+        ("Specificity",   b["specificity"]["score"]),
+        ("Model-aware",   b["model_aware"]["score"]),
+        ("Task coverage", b["task_cover"]["score"]),
+        ("Improvement",   b["improvement"]["score"]),
+        ("Human-grade",   b["llm_judge"]["score"]),
+    ]
+
+    bar_html = ""
+    for label, val in rows:
+        pct = max(0.0, min(val / 10.0, 1.0)) * 100
+        col = _bar_color(val)
+        bar_html += f"""
+        <div class="pf-score-row">
+          <span class="pf-score-label">{label}</span>
+          <span class="pf-score-track"><span class="pf-score-fill" style="width:{pct:.0f}%;background:{col};"></span></span>
+          <span class="pf-score-val">{val:.1f}</span>
+        </div>"""
+
+    reasoning_html = ""
+    if reasoning:
+        reasoning_html = f'<div class="pf-score-reason">{_esc(reasoning)}</div>'
+
+    return f"""
+    <div class="pf-score-card">
+      <div class="pf-score-head">
+        <span class="pf-grade-chip" style="background:{grade_col};">{_esc(s['grade'])}</span>
+        <span class="pf-score-overall">{s['overall']}<span class="pf-score-overall-max">/10</span></span>
+      </div>
+      <div class="pf-score-bars">{bar_html}</div>
+      {reasoning_html}
+    </div>"""

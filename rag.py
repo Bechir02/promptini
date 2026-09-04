@@ -3,88 +3,12 @@ import time
 
 from ingest import retrieve
 from llm import transform_prompt
+from core.constants import ALLOWED_MODELS, ALLOWED_DEPTHS, DEFAULT_MODEL, DEFAULT_DEPTH
+from core.tasks import detect_task_type  # canonical classifier (re-exported)
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_MODELS = {
-    "claude-code", "claude", "gpt-4", "cursor",
-    "gemini", "llama", "mistral", "copilot", "general"
-}
-ALLOWED_DEPTHS = {"concise", "standard", "comprehensive"}
-
-
-def detect_task_type(raw_prompt: str) -> str:
-    prompt_lower = raw_prompt.lower()
-
-    if any(w in prompt_lower for w in [
-        "extract", "pull out", "get fields", "fetch fields",
-        "retrieve fields", "parse json", "parse xml",
-        "pull the", "grab the fields",
-    ]):
-        return "extraction"
-
-    if any(w in prompt_lower for w in [
-        "system prompt", "persona", "act as",
-        "you are a", "build an agent", "make an agent",
-        "create an agent", "design an agent",
-    ]):
-        return "system_prompt"
-
-    if any(w in prompt_lower for w in [
-        "review", "audit", "evaluate", "assess", "critique",
-        "check for bugs", "check for issues", "check for errors",
-        "monitor", "scan for", "look for issues",
-    ]) and not any(w in prompt_lower for w in ["fix", "debug"]):
-        return "code_review"
-
-    if any(w in prompt_lower for w in [
-        "fix", "debug", "error", "bug", "issue", "broken",
-        "crash", "exception", "not working", "fails",
-    ]) and not any(w in prompt_lower for w in [
-        "review", "monitor", "check for", "agent", "scan",
-    ]):
-        return "debugging"
-
-    if any(w in prompt_lower for w in [
-        "refactor", "clean up", "improve", "optimize",
-        "restructure", "simplify", "rewrite", "dry",
-        "boilerplate", "modularize", "decouple",
-    ]):
-        return "refactoring"
-
-    if any(w in prompt_lower for w in [
-        "document", "docs", "docstring", "readme",
-        "comment", "explain this code",
-    ]):
-        return "documentation"
-
-    if any(w in prompt_lower for w in [
-        "analyze", "analysis", "compare", "research",
-        "investigate", "study", "examine",
-    ]):
-        return "analysis"
-
-    if any(w in prompt_lower for w in [
-        "summarize", "summary", "tldr", "brief",
-        "overview", "recap", "condense", "main points",
-        "key takeaways", "gist", "abstract",
-    ]):
-        return "summarization"
-
-    if any(w in prompt_lower for w in [
-        "story", "essay", "blog post", "article",
-        "creative", "poem", "write about", "draft a",
-        "composing", "narrative", "script a",
-    ]):
-        return "writing"
-
-    if any(w in prompt_lower for w in [
-        "write", "create", "build", "implement", "generate",
-        "code", "function", "class", "script", "program", "develop",
-    ]):
-        return "code_generation"
-
-    return "general"
+__all__ = ["detect_task_type", "run_pipeline"]
 
 
 def run_pipeline(
@@ -95,11 +19,11 @@ def run_pipeline(
 ) -> dict:
 
     if target_model not in ALLOWED_MODELS:
-        logger.warning("Invalid target_model '%s' — defaulting to general", target_model)
-        target_model = "general"
+        logger.warning("Invalid target_model '%s' — defaulting to %s", target_model, DEFAULT_MODEL)
+        target_model = DEFAULT_MODEL
     if depth not in ALLOWED_DEPTHS:
-        logger.warning("Invalid depth '%s' — defaulting to standard", depth)
-        depth = "standard"
+        logger.warning("Invalid depth '%s' — defaulting to %s", depth, DEFAULT_DEPTH)
+        depth = DEFAULT_DEPTH
 
     task_type  = detect_task_type(raw_prompt)
     start_time = time.perf_counter()
@@ -153,7 +77,7 @@ if __name__ == "__main__":
         ("pull out the user id and email from this json",           "extraction"),
         ("fix the bug in my login function",                        "debugging"),
         ("write a python csv duplicate finder",                     "code_generation"),
-        ("make an agent that monitors my repo and checks for bugs", "code_review"),
+        ("make an agent that monitors my repo and checks for bugs", "system_prompt"),
         ("review this code for security issues",                    "code_review"),
         ("build an agent that acts as a customer support bot",      "system_prompt"),
         ("summarize this document",                                 "summarization"),

@@ -1,20 +1,25 @@
 import functools
 import hashlib
 import logging
-import os
 import json
 import pickle
 import lancedb
 from sentence_transformers import SentenceTransformer
 from pathlib import Path
 
+from core.config import get_settings
+from core.constants import DEFAULT_TOP_K, DEFAULT_MIN_QUALITY
+from core.fusion import fuse_hits
+from core.retrieval import validate_filter_inputs
+
 logger = logging.getLogger(__name__)
+_settings = get_settings()
 
 # ── Config ──────────────────────────────────────────────────────────────────
-PROMPTS_FILE    = "prompts.json"
-DB_PATH         = "lancedb_store"
+PROMPTS_FILE    = _settings.prompts_file
+DB_PATH         = _settings.db_path
 TABLE_NAME      = "prompts"
-MODEL_NAME      = "BAAI/bge-small-en-v1.5"
+MODEL_NAME      = _settings.embedding_model
 EMBEDDING_CACHE = "embedding_cache.pkl"
 
 # ── Load embedding model ─────────────────────────────────────────────────────
@@ -40,8 +45,23 @@ def embed(text: str) -> list[float]:
 
 # ── Persistent embedding cache ───────────────────────────────────────────────
 def _get_cache_key(prompts: list[dict]) -> str:
-    """Generate a hash of prompts.json content so cache invalidates on changes."""
-    content = json.dumps([p.get('id', '') for p in prompts], sort_keys=True)
+    """Hash the embedding inputs so the cache invalidates correctly.
+
+    Includes the embedding model name AND the actual text that gets embedded
+    (id + task_type + target_model + prompt prefix) — not just ids. Editing a
+    prompt's text or switching the embedding model now busts the cache, which
+    the previous id-only key failed to do.
+    """
+    payload = [
+        (
+            p.get("id", ""),
+            p.get("task_type", ""),
+            p.get("target_model", ""),
+            p.get("prompt", "")[:300],
+        )
+        for p in prompts
+    ]
+    content = json.dumps([MODEL_NAME, payload], sort_keys=True)
     return hashlib.md5(content.encode()).hexdigest()
 
 def _load_embedding_cache(prompts: list[dict]) -> list | None:
@@ -154,19 +174,27 @@ def retrieve(
     query:        str,
     target_model: str  = "general",
     task_type:    str  = "general",
-    top_k:        int  = 3,
-    min_quality:  float = 7.0,
+    top_k:        int  = DEFAULT_TOP_K,
+    min_quality:  float = DEFAULT_MIN_QUALITY,
 ) -> list[dict]:
     """
     Retrieve top_k relevant prompts for a given query.
-    Filters by target_model and min quality_score before vector search.
-    Falls back to general if no model-specific results found.
+
+    Uses hybrid search (vector + full-text) fused with Reciprocal Rank Fusion,
+    filtered by target_model / task_type / quality. Falls back exact -> model ->
+    general until ``top_k`` results are collected. Inputs are validated against
+    allow-lists before being interpolated into filters.
     """
+    target_model, task_type, min_quality = validate_filter_inputs(
+        target_model, task_type, min_quality
+    )
+
     table = get_table()
 
     # Embed the query with task+model context
     query_vector = embed(f"{task_type} {target_model} {query}")
 
+    # Values below are allow-list validated, so interpolation is safe.
     exact_filter = (
         f"target_model = '{target_model}' "
         f"AND task_type = '{task_type}' "
@@ -178,52 +206,45 @@ def retrieve(
     )
     general_filter = f"quality_score >= {min_quality}"
 
-    results = []
+    results: list[dict] = []
+    seen: set = set()
+
     for metadata_filter in (exact_filter, model_filter, general_filter):
         if len(results) >= top_k:
             break
-        
-        candidates = []
+
         try:
-            # 1. Vector search
             v_hits = (
                 table.search(query_vector)
                      .where(metadata_filter)
-                     .limit(top_k)
+                     .limit(top_k * 2)
                      .to_list()
             )
-            candidates.extend(v_hits)
-            
-            # 2. FTS search (Keyword matching)
-            # We search for the raw query string
             f_hits = (
                 table.search(query)
                      .where(metadata_filter)
-                     .limit(top_k)
+                     .limit(top_k * 2)
                      .to_list()
             )
-            candidates.extend(f_hits)
-            
         except Exception as exc:
             logger.warning("LanceDB search failed for filter '%s': %s", metadata_filter, exc)
+            continue
 
-        # Merge, deduplicate by id, prioritize vector hits slightly by order
-        seen = {r["id"] for r in results}
-        for r in candidates:
+        # Reciprocal Rank Fusion of the two rankings (no score calibration needed).
+        fused = fuse_hits([v_hits, f_hits], id_key="id")
+        for r in fused:
             if r["id"] not in seen:
                 results.append(r)
                 seen.add(r["id"])
                 if len(results) >= top_k:
                     break
 
-        if len(results) >= top_k:
-            break
-
-    # Clean up
+    # Clean up internal fields before returning.
     for r in results:
         r.pop("vector", None)
-        r.pop("_distance", None) # Remove search distance/score
+        r.pop("_distance", None)
         r.pop("_score", None)
+        r.pop("rrf_score", None)
 
     return results[:top_k]
 

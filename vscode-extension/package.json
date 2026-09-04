@@ -74,6 +74,11 @@
           "type": "string",
           "default": "https://becher-zribi-prompt-forge-rag.hf.space",
           "description": "The URL of your Hugging Face Space (if mode is set to cloud)."
+        },
+        "promptForge.pythonPath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional absolute path to a Python interpreter for Local mode. Leave empty to auto-detect a .venv in the workspace, otherwise system python3 is used."
         }
       }
     }

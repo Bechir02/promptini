@@ -11,3 +11,5 @@ vscode-extension/out/
 vscode-extension/node_modules/
 vscode-extension/*.vsix
 vscode-extension/*.png
+# Generated at runtime (rebuilt from prompts.json on first start)
+embedding_cache.pkl

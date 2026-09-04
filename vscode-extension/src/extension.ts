@@ -170,16 +170,29 @@ function getWebviewHtml(url: string, mode: string): string {
 }
 
 // ── Python launcher ──────────────────────────────────────────────────────────
-function choosePythonCommand(): string {
-    const venvPython = "/Users/mac/Desktop/prompt-forge-rag/.venv/bin/python3";
-    if (require("fs").existsSync(venvPython)) {
-        return venvPython;
+function choosePythonCommand(cwd?: string): string {
+    // 1. Explicit override from settings.
+    const configured = vscode.workspace.getConfiguration("promptForge").get<string>("pythonPath");
+    if (configured && fs.existsSync(configured)) {
+        return configured;
     }
+    // 2. A .venv inside the workspace.
+    if (cwd) {
+        const candidates = process.platform === "win32"
+            ? [path.join(cwd, ".venv", "Scripts", "python.exe")]
+            : [path.join(cwd, ".venv", "bin", "python3"), path.join(cwd, ".venv", "bin", "python")];
+        for (const c of candidates) {
+            if (fs.existsSync(c)) {
+                return c;
+            }
+        }
+    }
+    // 3. System python.
     return process.platform === "win32" ? "python" : "python3";
 }
 
 function launchPromptForge(appPath: string, cwd: string, port: number, output: vscode.OutputChannel): ChildProcess {
-  const python = choosePythonCommand();
+  const python = choosePythonCommand(cwd);
   const env = { ...process.env, GRADIO_SERVER_PORT: port.toString() };
   const childProcess = spawn(python, [appPath], {
     cwd,
@@ -317,7 +330,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     const config = vscode.workspace.getConfiguration("promptForge");
     const mode = config.get<string>("mode") || "cloud";
-    const hfUrl = config.get<string>("hfUrl") || "https://huggingface.co/spaces/Becher-zribi/prompt-forge-rag";
+    const hfUrl = config.get<string>("hfUrl") || "https://becher-zribi-prompt-forge-rag.hf.space";
 
     if (mode === "cloud") {
       output.appendLine(`Opening Cloud Mode: ${hfUrl}`);
