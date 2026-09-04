@@ -3,108 +3,324 @@
     "id": "derja-seed_001",
     "target_model": "general",
     "task_type": "extraction",
-    "prompt": "Rôle: Tu es un assistant d'extraction de données pour une PME tunisienne.\nTâche: À partir du texte d'une facture, extrais: numéro de facture, date, nom du client, matricule fiscal, montant HT, TVA, montant TTC.\nSortie: JSON avec ces champs exacts; mets null si un champ est absent. N'invente rien.",
+    "prompt": "Rôle: Assistant d'extraction pour une PME tunisienne.\nTâche: À partir du texte d'une facture, extrais en JSON: numero_facture, date, matricule_fiscal, client, montant_ht, tva, montant_ttc.\nContraintes: mets null si un champ manque; n'invente rien; garde les montants en TND.",
     "source_repo": "curated/derja-seed",
     "license": "CC0-1.0",
-    "quality_score": 9.0
+    "quality_score": 9.1
   },
   {
     "id": "derja-seed_002",
     "target_model": "claude",
-    "task_type": "system_prompt",
-    "prompt": "<role>\nإنت مساعد خدمة الحرفاء متاع محل بيع أونلاين في تونس. تحكي بالدارجة التونسية بطريقة محترمة ومختصرة.\n</role>\n<task>\nجاوب على أسئلة الحرفاء على الطلبيات، التوصيل، والإرجاع.\n</task>\n<constraints>\n- ما تعطيش معلومة ما تعرفهاش؛ قول للحريف باش يتواصل مع الدعم.\n- استعمل الدينار التونسي (TND) في الأسعار.\n</constraints>",
+    "task_type": "extraction",
+    "prompt": "<role>مساعد استخراج بيانات</role>\n<task>من نص سيرة ذاتية، استخرج: الاسم، البريد، الهاتف، سنوات الخبرة، المهارات (قائمة)</task>\n<constraints>أرجع JSON فقط؛ كان فما حاجة ناقصة حطّ null؛ ما تخمّنش</constraints>",
     "source_repo": "curated/derja-seed",
     "license": "CC0-1.0",
     "quality_score": 9.0
   },
   {
     "id": "derja-seed_003",
-    "target_model": "gpt-4",
-    "task_type": "marketing_copy",
-    "prompt": "## Rôle\nCopywriter marketing pour une PME tunisienne.\n\n## Tâche\nÉcris 3 variantes d'une accroche Instagram pour une promotion de -30% sur des produits artisanaux.\n\n## Contraintes\n- Ton chaleureux, mélange français + darija légère.\n- Chaque variante < 20 mots, avec un appel à l'action clair.\n- Pas de hashtags génériques; 2 hashtags pertinents max.",
+    "target_model": "general",
+    "task_type": "extraction",
+    "prompt": "الدور: مساعد للتجار.\nالمهمة: من رسالة واتساب متاع مورّد، استخرج: اسم المنتج، الكمية، السعر بالدينار، تاريخ التسليم.\nالقيود: أرجع JSON؛ كان المعلومة مش واضحة حطّ null.",
     "source_repo": "curated/derja-seed",
     "license": "CC0-1.0",
-    "quality_score": 8.5
+    "quality_score": 8.7
   },
   {
     "id": "derja-seed_004",
-    "target_model": "general",
-    "task_type": "data_cleaning",
-    "prompt": "Rôle: Analyste data.\nTâche: Nettoie ce fichier clients (CSV) exporté d'un ERP.\nÉtapes: normalise les numéros de téléphone tunisiens au format +216XXXXXXXX, unifie les villes (ex: 'Tunis', 'tunis ', 'TUNIS' -> 'Tunis'), supprime les doublons par (nom, téléphone), signale les emails invalides.\nSortie: un CSV nettoyé + un journal des changements. Ne modifie pas l'original.",
+    "target_model": "claude",
+    "task_type": "system_prompt",
+    "prompt": "<role>إنت مساعد خدمة الحرفاء متاع محل بيع أونلاين في تونس. تحكي بالدارجة التونسية، محترم ومختصر.</role>\n<task>جاوب على أسئلة الطلبيات، التوصيل، والإرجاع.</task>\n<constraints>- ما تعطيش معلومة ما تعرفهاش، وجّه للدعم\n- استعمل الدينار التونسي (TND)\n- كان السؤال برّا الموضوع، رجّع الحريف بلطف</constraints>",
     "source_repo": "curated/derja-seed",
     "license": "CC0-1.0",
-    "quality_score": 9.0
+    "quality_score": 9.1
   },
   {
     "id": "derja-seed_005",
     "target_model": "general",
-    "task_type": "translation",
-    "prompt": "Rôle: Traducteur.\nTâche: Traduis ce message de support du français vers la darija tunisienne (écriture arabe), ton poli et rassurant.\nContraintes: garde les noms de produits et les numéros de commande tels quels; n'ajoute aucun commentaire.",
+    "task_type": "system_prompt",
+    "prompt": "Rôle: Assistant de réservation pour un restaurant à Tunis.\nComporte-toi: chaleureux, efficace, bilingue français/derja.\nRègles: demande date, heure, nombre de personnes; confirme en une phrase; propose une alternative si complet; ne prends jamais de paiement.",
     "source_repo": "curated/derja-seed",
     "license": "CC0-1.0",
-    "quality_score": 8.5
+    "quality_score": 8.8
   },
   {
     "id": "derja-seed_006",
+    "target_model": "claude",
+    "task_type": "system_prompt",
+    "prompt": "<role>مساعد وكالة عقارية تونسية</role>\n<task>ساعد الحريف يلقى كراء/شراء حسب الميزانية والولاية</task>\n<constraints>اسأل على: الولاية، الميزانية بالدينار، عدد الغرف؛ ما توعدش بحاجة ما تنجّمش تأكّدها</constraints>",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.7
+  },
+  {
+    "id": "derja-seed_007",
     "target_model": "claude-code",
-    "task_type": "code_generation",
-    "prompt": "<role>\nYou are a senior Python engineer helping a Tunisian fintech.\n</role>\n<task>\nWrite validate_rib(rib: str) -> bool that validates a Tunisian bank RIB (20 digits) including its check-key.\n</task>\n<constraints>\n- Pure standard library.\n- Raise ValueError on non-digit / wrong-length input.\n- Include 2 doctest examples.\n</constraints>\n<output_format>\nA single function with a docstring.\n</output_format>",
+    "task_type": "code_review",
+    "prompt": "<role>Senior security reviewer.</role>\n<task>Review this Python REST endpoint for a Tunisian fintech.</task>\n<constraints>\n- Severity levels: critical / warning / suggestion\n- Focus: injection, authz, secrets, input validation\n- Give an actionable fix per finding; note one positive too</constraints>",
     "source_repo": "curated/derja-seed",
     "license": "CC0-1.0",
     "quality_score": 9.0
   },
   {
-    "id": "derja-seed_007",
-    "target_model": "general",
-    "task_type": "summarization",
-    "prompt": "الدور: مساعد إداري.\nالمهمة: لخّص هذا العقد التجاري في 5 نقاط واضحة لصاحب مشروع صغير.\nالقيود: ركّز على الالتزامات، المدة، شروط الدفع، وحالات الفسخ. تجنّب المصطلحات القانونية المعقّدة. ابدأ بجملة TL;DR واحدة.",
-    "source_repo": "curated/derja-seed",
-    "license": "CC0-1.0",
-    "quality_score": 8.5
-  },
-  {
     "id": "derja-seed_008",
     "target_model": "gpt-4",
-    "task_type": "analysis",
-    "prompt": "## Rôle\nAnalyste business pour une PME de e-commerce en Tunisie.\n\n## Tâche\nAnalyse ces ventes mensuelles et identifie 3 tendances + 2 recommandations.\n\n## Sortie\n- Résumé (2 phrases)\n- 3 tendances avec chiffres à l'appui\n- 2 recommandations concrètes\n- Niveau de confiance pour chaque conclusion",
+    "task_type": "code_review",
+    "prompt": "## Rôle\nReviewer front-end.\n## Tâche\nFais une revue de ce composant React (formulaire de paiement).\n## Critères\n- Accessibilité, gestion d'erreurs, sécurité des entrées\n- Niveaux: critique / avertissement / suggestion\n- Propose un correctif concret par point.",
     "source_repo": "curated/derja-seed",
     "license": "CC0-1.0",
-    "quality_score": 8.5
+    "quality_score": 8.7
   },
   {
     "id": "derja-seed_009",
-    "target_model": "general",
-    "task_type": "sql",
-    "prompt": "Rôle: Data engineer.\nTâche: Écris une requête PostgreSQL qui liste, par gouvernorat, le chiffre d'affaires du mois courant.\nContexte: tables orders(id, client_id, total_ttc, created_at) et clients(id, gouvernorat).\nContraintes: JOIN explicite, filtre sur le mois courant, tri décroissant par CA. Ajoute une phrase expliquant le résultat.",
+    "target_model": "claude",
+    "task_type": "debugging",
+    "prompt": "<role>إنت مطوّر Python.</role>\n<task>عندي فنكشن تقرا CSV و تطيّح UnicodeDecodeError مع الملفات بالعربي.</task>\n<constraints>- بيّن السبب الجذري قبل الحل\n- الحل يخدم مع UTF-8\n- زيد خطوة تثبّت أنو تصلّح</constraints>",
     "source_repo": "curated/derja-seed",
     "license": "CC0-1.0",
-    "quality_score": 8.5
+    "quality_score": 9.0
   },
   {
     "id": "derja-seed_010",
-    "target_model": "claude",
+    "target_model": "general",
     "task_type": "debugging",
-    "prompt": "<role>\nإنت مطوّر Python.\n</role>\n<task>\nعندي فنكشن تقرا فيشيي CSV و تطيّحب UnicodeDecodeError. صلّح المشكل.\n</task>\n<constraints>\n- بيّن السبب الجذري قبل الحل.\n- الحل يلزمو يخدم مع الفيشيات بالعربي (UTF-8).\n- زيد خطوة تثبّت أنّو تصلّح.\n</constraints>",
+    "prompt": "Rôle: Ingénieur Python.\nTâche: Corrige un pandas 'SettingWithCopyWarning' qui fausse mes totaux TVA.\nContraintes: explique la cause racine, donne le correctif, ajoute une vérification. Garde le comportement existant.",
     "source_repo": "curated/derja-seed",
     "license": "CC0-1.0",
-    "quality_score": 8.5
+    "quality_score": 8.8
   },
   {
     "id": "derja-seed_011",
-    "target_model": "general",
-    "task_type": "writing",
-    "prompt": "Rôle: Rédacteur.\nTâche: Rédige un email professionnel (français) pour relancer un client tunisien sur une facture impayée depuis 30 jours.\nContraintes: ton courtois mais ferme, < 120 mots, rappelle le numéro et le montant en TND, propose un contact pour toute question. Pas de menace.",
+    "target_model": "cursor",
+    "task_type": "refactoring",
+    "prompt": "You are working inside Cursor on a Tunisian SaaS codebase.\nRefactor the phone helper so it normalizes 216..., +216..., 00216... and local 8-digit numbers to +216XXXXXXXX. Preserve valid inputs.\nVerify: run existing tests and add a case per input shape.",
     "source_repo": "curated/derja-seed",
     "license": "CC0-1.0",
-    "quality_score": 8.0
+    "quality_score": 8.9
   },
   {
     "id": "derja-seed_012",
-    "target_model": "cursor",
+    "target_model": "gpt-4",
     "task_type": "refactoring",
-    "prompt": "You are working inside Cursor on a Tunisian SaaS codebase.\n\nRefactor the phone-normalization helper so it handles Tunisian numbers written as 216..., +216..., 00216..., or local 8-digit form, all normalized to +216XXXXXXXX. Preserve behavior for already-valid inputs.\n\nVerify: run the existing tests and add cases for each input shape.",
+    "prompt": "## Rôle\nIngénieur data.\n## Tâche\nRefactorise ce pipeline d'import clients pour réduire la complexité et isoler les I/O.\n## Contraintes\n- Préserve tout le comportement et les tests\n- Un seul objectif architectural à la fois\n- Explique chaque pattern appliqué.",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.6
+  },
+  {
+    "id": "derja-seed_013",
+    "target_model": "general",
+    "task_type": "documentation",
+    "prompt": "Rôle: Rédacteur technique.\nTâche: Écris les docstrings (format Google) pour ces fonctions de facturation.\nContraintes: documente params, retours, exceptions; ajoute un exemple d'usage par fonction; audience: développeur junior.",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.7
+  },
+  {
+    "id": "derja-seed_014",
+    "target_model": "claude",
+    "task_type": "documentation",
+    "prompt": "<role>كاتب تقني</role>\n<task>اكتب README مختصر لأداة تولّد فواتير PDF بالدينار التونسي</task>\n<constraints>يشمل: التنصيب، مثال استعمال، المتغيرات المطلوبة؛ بالإنقليزي، مختصر</constraints>",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.6
+  },
+  {
+    "id": "derja-seed_015",
+    "target_model": "gpt-4",
+    "task_type": "analysis",
+    "prompt": "## Rôle\nAnalyste business (e-commerce Tunisie).\n## Tâche\nAnalyse ces ventes mensuelles et sors 3 tendances + 2 recommandations.\n## Sortie\nRésumé (2 phrases), 3 tendances chiffrées, 2 actions concrètes, niveau de confiance par conclusion.",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.9
+  },
+  {
+    "id": "derja-seed_016",
+    "target_model": "general",
+    "task_type": "analysis",
+    "prompt": "Rôle: Analyste rétention.\nTâche: Analyse le churn de nos abonnés et identifie les 3 causes principales.\nContraintes: appuie chaque cause sur des chiffres, énonce les hypothèses, propose une action par cause.",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.6
+  },
+  {
+    "id": "derja-seed_017",
+    "target_model": "general",
+    "task_type": "summarization",
+    "prompt": "الدور: مساعد إداري.\nالمهمة: لخّص هذا العقد التجاري في 5 نقاط لصاحب مشروع صغير.\nالقيود: ركّز على الالتزامات، المدة، شروط الدفع، والفسخ؛ تجنّب المصطلحات المعقّدة؛ ابدا بجملة TL;DR.",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.9
+  },
+  {
+    "id": "derja-seed_018",
+    "target_model": "gpt-4",
+    "task_type": "summarization",
+    "prompt": "## Rôle\nAssistant de réunion.\n## Tâche\nRésume ce compte-rendu en: décisions, actions (avec responsable), points ouverts.\n## Contraintes\nMax 150 mots, ton neutre, une ligne TL;DR en tête.",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.6
+  },
+  {
+    "id": "derja-seed_019",
+    "target_model": "general",
+    "task_type": "summarization",
+    "prompt": "الدور: مساعد دعم.\nالمهمة: لخّص شكاوى الحرفاء هاذي في أهم 3 مشاكل متكرّرة مع عدد المرّات.\nالقيود: بالدارجة، مختصر، رتّب من الأكثر تكراراً.",
     "source_repo": "curated/derja-seed",
     "license": "CC0-1.0",
     "quality_score": 8.5
+  },
+  {
+    "id": "derja-seed_020",
+    "target_model": "general",
+    "task_type": "writing",
+    "prompt": "Rôle: Rédacteur.\nTâche: Rédige un email FR pour relancer un client sur une facture impayée depuis 30 jours.\nContraintes: courtois mais ferme, < 120 mots, rappelle le numéro et le montant en TND, propose un contact. Pas de menace.",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.7
+  },
+  {
+    "id": "derja-seed_021",
+    "target_model": "claude",
+    "task_type": "writing",
+    "prompt": "<role>كاتب محتوى</role>\n<task>اكتب إعلان إطلاق منتج جديد (زيت زيتون تونسي) لصفحة فيسبوك</task>\n<constraints>نبرة دافئة، أقل من 60 كلمة، دعوة واضحة للشراء، بدون مبالغة</constraints>",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.6
+  },
+  {
+    "id": "derja-seed_022",
+    "target_model": "claude-code",
+    "task_type": "code_generation",
+    "prompt": "<role>Senior Python engineer for a Tunisian fintech.</role>\n<task>Write validate_rib(rib: str) -> bool validating a 20-digit Tunisian bank RIB incl. its check-key.</task>\n<constraints>Standard library only; raise ValueError on bad input; include 2 doctests.</constraints>\n<output_format>One function with a docstring.</output_format>",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 9.1
+  },
+  {
+    "id": "derja-seed_023",
+    "target_model": "general",
+    "task_type": "code_generation",
+    "prompt": "Rôle: Développeur Python.\nTâche: Écris compute_ttc(ht: float, taux_tva: float = 0.19) -> dict retournant ht, tva, ttc arrondis à 3 décimales (millimes).\nContraintes: valide les entrées, lève ValueError si négatif, ajoute un exemple.",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.8
+  },
+  {
+    "id": "derja-seed_024",
+    "target_model": "gemini",
+    "task_type": "code_generation",
+    "prompt": "Tu es un assistant Python spécialisé data.\nTâche: Génère une fonction qui exporte une liste de dict en fichier Excel (.xlsx) avec en-têtes en gras.\nÉtapes: valider l'entrée, créer le classeur, écrire, sauvegarder.\nSortie: fonction + exemple d'appel. Gère le cas liste vide.",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.5
+  },
+  {
+    "id": "derja-seed_025",
+    "target_model": "general",
+    "task_type": "translation",
+    "prompt": "Rôle: Traducteur.\nTâche: Traduis ce message de support du français vers la darija tunisienne (écriture arabe), ton poli et rassurant.\nContraintes: garde les noms de produits et numéros de commande tels quels; aucune note.",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.8
+  },
+  {
+    "id": "derja-seed_026",
+    "target_model": "general",
+    "task_type": "translation",
+    "prompt": "الدور: مترجم.\nالمهمة: ترجم وصف المنتج هذا من العربي للفرنسي، بأسلوب تسويقي مناسب للسوق التونسي.\nالقيود: حافظ على اسم العلامة؛ رجّع الترجمة برك.",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.5
+  },
+  {
+    "id": "derja-seed_027",
+    "target_model": "gpt-4",
+    "task_type": "localization",
+    "prompt": "## Rôle\nSpécialiste localisation.\n## Tâche\nLocalise l'UI de cette app pour le marché tunisien.\n## Contraintes\n- Dates JJ/MM/AAAA, devise TND (3 décimales/millimes), RTL pour l'arabe\n- Adapte les exemples au contexte local; garde le code et les {placeholders}\n- Signale ce qui nécessite une revue humaine.",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.8
+  },
+  {
+    "id": "derja-seed_028",
+    "target_model": "general",
+    "task_type": "localization",
+    "prompt": "Rôle: Adaptateur marketing.\nTâche: Adapte ce texte promo pour un public tunisien (mélange FR + darija légère).\nContraintes: garde l'offre et l'appel à l'action; rends les références culturelles locales; même longueur.",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.5
+  },
+  {
+    "id": "derja-seed_029",
+    "target_model": "general",
+    "task_type": "data_cleaning",
+    "prompt": "Rôle: Analyste data.\nTâche: Nettoie ce fichier clients (CSV) exporté d'un ERP.\nÉtapes: normalise les téléphones tunisiens en +216XXXXXXXX, unifie les villes/gouvernorats, supprime les doublons (nom, téléphone), signale les emails invalides.\nSortie: CSV nettoyé + journal des changements. Ne modifie pas l'original.",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 9.0
+  },
+  {
+    "id": "derja-seed_030",
+    "target_model": "general",
+    "task_type": "data_cleaning",
+    "prompt": "Rôle: Data engineer.\nTâche: Dédoublonne ce catalogue produits et normalise les prix en millimes (entiers).\nContraintes: garde la 1re occurrence, journalise les fusions, ne mute pas la source; sortie: schéma [ref, nom, prix_mm].",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.6
+  },
+  {
+    "id": "derja-seed_031",
+    "target_model": "general",
+    "task_type": "sql",
+    "prompt": "Rôle: Data engineer.\nTâche: Écris une requête PostgreSQL du chiffre d'affaires du mois courant par gouvernorat.\nContexte: orders(id, client_id, total_ttc, created_at), clients(id, gouvernorat).\nContraintes: JOIN explicite, filtre mois courant, tri CA décroissant; ajoute une phrase d'explication.",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.9
+  },
+  {
+    "id": "derja-seed_032",
+    "target_model": "general",
+    "task_type": "sql",
+    "prompt": "Rôle: Analyste.\nTâche: Requête MySQL des 10 produits les plus vendus le mois dernier.\nContexte: order_items(order_id, product_id, qty), products(id, name).\nContraintes: JOIN explicite, GROUP BY, LIMIT 10; pas de SELECT *; explique le résultat.",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.6
+  },
+  {
+    "id": "derja-seed_033",
+    "target_model": "gpt-4",
+    "task_type": "marketing_copy",
+    "prompt": "## Rôle\nCopywriter marketing.\n## Tâche\nÉcris 3 variantes d'une accroche Instagram pour une promo -30% sur des produits artisanaux tunisiens.\n## Contraintes\nTon chaleureux (FR + darija légère), < 20 mots chacune, un appel à l'action clair, 2 hashtags pertinents max.",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.9
+  },
+  {
+    "id": "derja-seed_034",
+    "target_model": "general",
+    "task_type": "marketing_copy",
+    "prompt": "Rôle: Copywriter.\nTâche: Écris une annonce Facebook pour l'ouverture d'un café à Tunis.\nContraintes: 2 variantes, ton convivial, mentionne l'adresse [ADRESSE] et l'offre d'ouverture, CTA clair; pas de superlatifs vides.",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.5
+  },
+  {
+    "id": "derja-seed_035",
+    "target_model": "claude",
+    "task_type": "marketing_copy",
+    "prompt": "<role>كاتب إعلانات</role>\n<task>اكتب SMS ترويجي لصيدلية على تخفيضات مستحضرات التجميل</task>\n<constraints>أقل من 160 حرف، واضح، فيه دعوة للزيارة، بدون مبالغة، بالدارجة</constraints>",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.4
+  },
+  {
+    "id": "derja-seed_036",
+    "target_model": "general",
+    "task_type": "general",
+    "prompt": "Rôle: Assistant polyvalent.\nTâche: [DÉCRIS TA TÂCHE ICI].\nContraintes: sois spécifique, ajoute au moins une contrainte concrète, définis le format de sortie et ce qui compte comme réussite.",
+    "source_repo": "curated/derja-seed",
+    "license": "CC0-1.0",
+    "quality_score": 8.3
   }
 ]

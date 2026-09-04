@@ -198,6 +198,7 @@ footer, .footer, .hide-footer { display: none !important; }
   letter-spacing: -0.035em; line-height: 1.15; margin: 0 0 10px;
 }
 .pf-title .accent { color: var(--pf-accent); }
+.pf-title-ar { font-size: 22px; font-weight: 600; color: var(--pf-ink-soft); margin-inline-start: 8px; vertical-align: 2px; }
 .pf-sub {
   font-size: 14.5px; color: var(--pf-ink-soft); line-height: 1.6;
   max-width: 480px; margin: 0 auto;
@@ -368,15 +369,47 @@ button.secondary:hover { background: var(--pf-surface-2) !important; border-colo
 }
 """
 
+
+# ── Voice dictation (free, browser-native Web Speech API) ─────────────────────
+MIC_JS = """
+(lang) => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { if (window.pfToast) window.pfToast('Dictation needs Chrome or Edge'); return; }
+    try {
+        const rec = new SR();
+        rec.lang = lang || 'ar-TN';
+        rec.interimResults = true;
+        rec.continuous = false;
+        if (window.pfToast) window.pfToast('Listening… speak now');
+        let finalText = '';
+        rec.onresult = (e) => {
+            let interim = '';
+            for (let i = e.resultIndex; i < e.results.length; i++) {
+                const t = e.results[i][0].transcript;
+                if (e.results[i].isFinal) finalText += t; else interim += t;
+            }
+            const areas = document.querySelectorAll('textarea[data-testid="textbox"]');
+            if (areas.length) {
+                areas[0].value = (finalText + interim).trim();
+                areas[0].dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        };
+        rec.onerror = (ev) => { if (window.pfToast) window.pfToast('Mic: ' + ev.error); };
+        rec.onend = () => { if (window.pfToast) window.pfToast('Captured'); };
+        rec.start();
+    } catch (err) { if (window.pfToast) window.pfToast('Mic unavailable'); }
+}
+"""
+
 # ── UI ────────────────────────────────────────────────────────────────────────
-with gr.Blocks(title="Prompt Forge Arena", css=CSS) as demo:
+with gr.Blocks(title="M3allem · المْعلّم", css=CSS) as demo:
 
     # Header
     gr.HTML(f"""
 <div class="pf-header">
-  <div class="pf-badge">⚡ Arena Mode · {len(MODELS)} models · 8,435 exemplars</div>
-  <h1 class="pf-title">The Prompt <span class="accent">Arena</span></h1>
-  <p class="pf-sub">Turn a rough draft into a precise, model-optimized prompt. Pick two models to run them head-to-head.</p>
+  <div class="pf-badge">⚡ المْعلّم · Derja-first · {len(MODELS)} models · 8,435 exemplars</div>
+  <h1 class="pf-title">M<span class="accent">3</span>allem <span class="pf-title-ar">المْعلّم</span></h1>
+  <p class="pf-sub">خلّي البرومبت متاعك m3allem — speak or type a rough idea in Derja, Arabic, French or English, and get a precise, model-optimized prompt.</p>
 </div>
 """)
 
@@ -385,9 +418,17 @@ with gr.Blocks(title="Prompt Forge Arena", css=CSS) as demo:
         with gr.Column(scale=2):
             raw_input = gr.Textbox(
                 label       = "Messy prompt",
-                placeholder = "Paste your rough draft here…",
+                placeholder = "Paste — or dictate 🎙 — your rough draft here…",
                 lines       = 6,
             )
+            with gr.Row():
+                mic_lang = gr.Dropdown(
+                    choices = [("Derja · تونسي", "ar-TN"), ("Français", "fr-FR"), ("English", "en-US")],
+                    value   = "ar-TN",
+                    label   = "Dictation language",
+                    scale   = 2,
+                )
+                mic_btn = gr.Button("🎙 Dictate", scale=1, min_width=120)
         with gr.Column(scale=1):
             model_dropdown = gr.Dropdown(
                 choices     = MODELS,
@@ -473,6 +514,8 @@ with gr.Blocks(title="Prompt Forge Arena", css=CSS) as demo:
             meta_1, meta_2, exemplar_display,
         ],
     )
+
+    mic_btn.click(fn=None, inputs=[mic_lang], js=MIC_JS)
 
     battle_note.change(lambda x: gr.update(visible=bool(x)), inputs=battle_note, outputs=arena_note_row)
 

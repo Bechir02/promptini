@@ -1,7 +1,7 @@
 {
   "name": "prompt-forge-vscode",
-  "displayName": "Prompt Forge",
-  "description": "Transform messy notes into model-optimized prompts with RAG-powered intelligence. Supports Claude, GPT-4, Gemini, and more.",
+  "displayName": "M3allem \u2014 Derja Prompt Studio",
+  "description": "Speak or type in Tunisian Derja, Arabic, French or English \u2014 M3allem forges precise, model-optimized prompts with RAG. Claude, GPT-4, Gemini and more.",
   "version": "0.8.0",
   "icon": "icon.png",
   "publisher": "BecherZribi",

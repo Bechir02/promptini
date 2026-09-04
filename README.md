@@ -1,13 +1,17 @@
 ---
-title: Prompt Forge Rag
-emoji: 😻
-colorFrom: blue
-colorTo: indigo
+title: M3allem — Derja Prompt Studio
+emoji: ⚡
+colorFrom: red
+colorTo: yellow
 sdk: gradio
 sdk_version: 6.13.0
 app_file: app.py
 pinned: false
 ---
+
+# M3allem · المْعلّم
+
+**Derja-first prompt studio.** Speak or type a rough idea — in Tunisian Derja, Arabic, French or English — and M3allem forges a precise, model-optimized prompt, then scores it. Built entirely on free tools (Hugging Face Spaces, Groq/Cerebras free tiers, browser-native voice input).
 
 Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference
 
