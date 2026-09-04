@@ -1,0 +1,96 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: 'Inter', system-ui, sans-serif; background: #f4f2ee; color: #1c1b19; }
+    a { color: #c15f3c; } a:hover { color: #a94e2e; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    .row { display: flex; align-items: center; gap: 12px; }
+    .lbl { flex: 0 0 110px; font-size: 12px; font-weight: 500; color: #605c55; }
+    .trk { flex: 1; height: 8px; background: #e7e4de; border-radius: 100px; overflow: hidden; }
+    .fill { display: block; height: 100%; border-radius: 100px; }
+    .val { flex: 0 0 34px; text-align: right; font-size: 12.5px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+  </style>
+</helmet>
+
+<div style="width: 1080px; padding: 36px 40px 40px; background: #f4f2ee;">
+
+  <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#c58a2c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0V4zM17 4h3v2a3 3 0 0 1-3 3M7 4H4v2a3 3 0 0 0 3 3"></path></svg>
+    <h2 style="margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.02em;">Battle result</h2>
+  </div>
+  <p style="margin: 0 0 22px; font-size: 14px; color: #605c55;">An LLM judge scores both versions on six dimensions, then picks the stronger for the user's likely intent.</p>
+
+  <!-- two score cards -->
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+
+    <div style="background: #ffffff; border: 2px solid #5f8a4c; border-radius: 16px; box-shadow: 0 1px 2px rgba(28,27,25,0.04), 0 10px 30px rgba(28,27,25,0.05); padding: 22px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="color: #fff; font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 100px; background: #5f8a4c;">A — Excellent</span>
+          <span style="font-size: 12px; font-weight: 600; color: #5f8a4c;">WINNER</span>
+        </div>
+        <span style="font-size: 30px; font-weight: 700; letter-spacing: -0.02em;">9.1<span style="font-size: 15px; font-weight: 500; color: #9a958c;">/10</span></span>
+      </div>
+      <div class="mono" style="font-size: 12px; color: #9a958c; margin-bottom: 14px;">claude-code · code_generation</div>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div class="row"><span class="lbl">Structure</span><span class="trk"><span class="fill" style="width:100%;background:#5f8a4c;"></span></span><span class="val">10.0</span></div>
+        <div class="row"><span class="lbl">Specificity</span><span class="trk"><span class="fill" style="width:92%;background:#5f8a4c;"></span></span><span class="val">9.2</span></div>
+        <div class="row"><span class="lbl">Model-aware</span><span class="trk"><span class="fill" style="width:100%;background:#5f8a4c;"></span></span><span class="val">10.0</span></div>
+        <div class="row"><span class="lbl">Task coverage</span><span class="trk"><span class="fill" style="width:75%;background:#c58a2c;"></span></span><span class="val">7.5</span></div>
+        <div class="row"><span class="lbl">Improvement</span><span class="trk"><span class="fill" style="width:90%;background:#5f8a4c;"></span></span><span class="val">9.0</span></div>
+        <div class="row"><span class="lbl">Human-grade</span><span class="trk"><span class="fill" style="width:88%;background:#5f8a4c;"></span></span><span class="val">8.8</span></div>
+      </div>
+    </div>
+
+    <div style="background: #ffffff; border: 1px solid #e7e4de; border-radius: 16px; box-shadow: 0 1px 2px rgba(28,27,25,0.04), 0 10px 30px rgba(28,27,25,0.05); padding: 22px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+        <span style="color: #fff; font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 100px; background: #5f8a4c;">B — Good</span>
+        <span style="font-size: 30px; font-weight: 700; letter-spacing: -0.02em; color: #605c55;">8.3<span style="font-size: 15px; font-weight: 500; color: #9a958c;">/10</span></span>
+      </div>
+      <div class="mono" style="font-size: 12px; color: #9a958c; margin-bottom: 14px;">gpt-4 · code_generation</div>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div class="row"><span class="lbl">Structure</span><span class="trk"><span class="fill" style="width:100%;background:#5f8a4c;"></span></span><span class="val">10.0</span></div>
+        <div class="row"><span class="lbl">Specificity</span><span class="trk"><span class="fill" style="width:80%;background:#5f8a4c;"></span></span><span class="val">8.0</span></div>
+        <div class="row"><span class="lbl">Model-aware</span><span class="trk"><span class="fill" style="width:90%;background:#5f8a4c;"></span></span><span class="val">9.0</span></div>
+        <div class="row"><span class="lbl">Task coverage</span><span class="trk"><span class="fill" style="width:60%;background:#c58a2c;"></span></span><span class="val">6.0</span></div>
+        <div class="row"><span class="lbl">Improvement</span><span class="trk"><span class="fill" style="width:90%;background:#5f8a4c;"></span></span><span class="val">9.0</span></div>
+        <div class="row"><span class="lbl">Human-grade</span><span class="trk"><span class="fill" style="width:78%;background:#5f8a4c;"></span></span><span class="val">7.8</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- verdict -->
+  <div style="background: #ffffff; border: 1px solid #e7e4de; border-radius: 16px; box-shadow: 0 1px 2px rgba(28,27,25,0.04), 0 10px 30px rgba(28,27,25,0.05); padding: 22px; margin-top: 20px;">
+    <div style="font-size: 15px; font-weight: 700; margin-bottom: 8px;">Why Version A wins</div>
+    <p style="margin: 0 0 16px; font-size: 13.5px; color: #605c55; line-height: 1.65;">Both are well-structured, but A commits to an explicit output schema and a testable constraint set, removing ambiguity a code model would otherwise guess at. B reads cleanly yet leaves the return shape and edge cases implicit.</p>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+      <div>
+        <span style="display: block; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #5f8a4c; margin-bottom: 8px;">Strengths — A</span>
+        <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 5px;">
+          <li style="font-size: 12.5px; color: #605c55; line-height: 1.5;">Explicit &lt;output_format&gt; with a concrete return schema</li>
+          <; display: flex; flex-direction: column; gap: 5px;">
+          <Handles the missing-file and no-duplicates edge cases5;">Explicit &lt;output_format&gt; with a concrete return schema</li>
+          <Model-correct XML formatting for claude-code5;">Explicit &</ul>
+      </div>
+      <div>
+        <span style="display: block; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #9a958c; margin-bottom: 8px;">Strengths — B</span>
+        <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 5px;">
+          <li style="font-size: 12.5px; color: #605c55; line-height: 1.5;">Clear numbered plan, easy to skim5;">Explicit &lt;output_format&gt; with a concrete return schema</li>
+          <Idiomatic markdown for gpt-45;">Explicit &</ul>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>
