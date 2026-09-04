@@ -17,6 +17,12 @@ MODELS: list[str] = [
     "llama",
     "mistral",
     "copilot",
+    "deepseek",
+    "qwen",
+    "grok",
+    "v0",
+    "bolt",
+    "windsurf",
     "general",
 ]
 ALLOWED_MODELS: frozenset[str] = frozenset(MODELS)
@@ -46,6 +52,11 @@ TASK_TYPES: list[str] = [
     "summarization",
     "writing",
     "code_generation",
+    "translation",
+    "localization",
+    "data_cleaning",
+    "sql",
+    "marketing_copy",
     "general",
 ]
 DEFAULT_TASK_TYPE: str = "general"

@@ -95,6 +95,26 @@ def detect_task_type(raw_prompt: str) -> str:
         return "debugging"
 
     if any(w in p for w in [
+        "translate", "translation", "traduire", "traduis", "traduction",
+        "ترجم", "ترجمة", "ترجملي",
+    ]):
+        return "translation"
+
+    if any(w in p for w in [
+        "localize", "localise", "localization", "localisation", "localiser",
+        "adapt for", "adapt this for", "توطين", "اقلمة", "تعريب",
+    ]):
+        return "localization"
+
+    if any(w in p for w in [
+        "clean the data", "clean up the data", "data cleaning", "deduplicate",
+        "drop duplicates", "remove duplicates", "missing values", "impute",
+        "normalize the data", "nettoyer les donnees", "nettoyage des donnees",
+        "تنظيف البيانات", "نظف البيانات",
+    ]):
+        return "data_cleaning"
+
+    if any(w in p for w in [
         # en
         "refactor", "clean up", "improve", "optimize", "restructure", "simplify",
         "rewrite", "dry", "boilerplate", "modularize", "decouple",
@@ -140,6 +160,13 @@ def detect_task_type(raw_prompt: str) -> str:
         return "analysis"
 
     if any(w in p for w in [
+        "marketing copy", "ad copy", "advert", "advertisement", "slogan",
+        "tagline", "landing page copy", "call to action", "product description",
+        "publicite", "annonce publicitaire", "وصف منتج", "اعلان", "شعار",
+    ]):
+        return "marketing_copy"
+
+    if any(w in p for w in [
         # en
         "story", "essay", "blog post", "article", "creative", "poem", "write about",
         "draft a", "composing", "narrative", "script a",
@@ -150,6 +177,12 @@ def detect_task_type(raw_prompt: str) -> str:
         "اكتب مقال", "قصة", "مقال", "انشئ نص", "تدوينة", "قصيدة",
     ]):
         return "writing"
+
+    if any(w in p for w in [
+        "sql", "sql query", "select from", "select * from", "joins", "jointure",
+        "requete sql", "قاعدة بيانات", "استعلام",
+    ]):
+        return "sql"
 
     if any(w in p for w in [
         # en

@@ -183,6 +183,81 @@ Handle FileNotFoundError. Do not modify existing functions in the file.""",
 
 **Output Format:** DataFrame with columns [duplicate_row, count] plus a summary string.""",
     },
+
+    "deepseek": {
+        "format":      "structured",
+        "description": "Clear labeled sections (Role, Task, Requirements, Output). DeepSeek follows explicit step-by-step instructions well; put reasoning steps before the answer for reasoning tasks. No XML.",
+        "example": """Role: You are a senior Python engineer.
+
+Task: Find duplicate rows in a CSV and return them with counts.
+
+Requirements:
+- Use pandas; do not modify the source file
+- Raise ValueError on a missing file
+
+Output: DataFrame[duplicate_row, count] + a one-line summary.""",
+    },
+
+    "qwen": {
+        "format":      "markdown",
+        "description": "Markdown sections with explicit numbered steps and clear delimiters. State the output format explicitly. Qwen responds well to structured, unambiguous instructions.",
+        "example": """## Role
+Python data engineer.
+
+## Task
+Find duplicate rows in a CSV and return them with counts.
+
+## Steps
+1. Load the CSV with pandas
+2. Identify duplicate rows
+3. Return a DataFrame [duplicate_row, count]
+
+## Output
+DataFrame + one-line summary.""",
+    },
+
+    "grok": {
+        "format":      "minimal",
+        "description": "Direct and concise. Lead with the task in one sentence, then only the essential constraints. No long preamble.",
+        "example": """Find duplicate rows in {csv_path} with pandas and return a DataFrame [duplicate_row, count]. Raise ValueError if the file is missing, return empty if none, and print "Found X duplicates." """,
+    },
+
+    "v0": {
+        "format":      "minimal",
+        "description": "For Vercel v0 UI generation. Describe the component/page, the stack (React/Next.js + Tailwind + shadcn/ui), layout, states and data shape. Visual and specific; one screen per prompt.",
+        "example": """Build a responsive pricing page in Next.js + Tailwind + shadcn/ui.
+
+- Three plan cards (Starter, Pro, Enterprise) with a monthly/annual toggle
+- Highlight the Pro card; a CTA button on each
+- Mobile: stacked; Desktop: 3 columns
+
+Use placeholder copy and prices.""",
+    },
+
+    "bolt": {
+        "format":      "structured",
+        "description": "For bolt.new full-app scaffolding. State the app, the stack, the pages/files and the data model. Action-oriented — build end-to-end, not a single snippet.",
+        "example": """Build a to-do web app.
+
+Stack: React + Vite + Tailwind, localStorage persistence.
+
+Features:
+- Add / complete / delete tasks
+- Filter: all / active / done
+- Persist across reloads
+
+Deliver a runnable project with components split into files.""",
+    },
+
+    "windsurf": {
+        "format":      "minimal",
+        "description": "For the Windsurf (Cascade) IDE agent. Minimal, action-first, file-aware. Name the file/function, the exact change, and a verification step. One task at a time.",
+        "example": """In src/utils/csv.py, add find_duplicates(csv_path: str) -> pd.DataFrame that returns duplicate rows with counts.
+
+Handle FileNotFoundError. Do not touch other functions.
+
+Verify: run it on a test CSV with known duplicates.""",
+    },
 }
 
 # ── Task-specific guidance ────────────────────────────────────────────────────
@@ -268,6 +343,41 @@ TASK_GUIDANCE: dict[str, str] = {
 - Add at least one concrete constraint
 - Define the output format explicitly
 - Specify what success looks like
+""",
+    "translation": """
+- State the source and target languages explicitly
+- Specify register/tone (formal, casual, technical) and audience
+- Preserve meaning, names, numbers, code and {placeholders} exactly
+- Say how to handle idioms (localize vs. literal) and untranslatable terms
+- Return only the translation — no commentary
+""",
+    "localization": """
+- Name the target locale(s) and their conventions (dates, currency, units, RTL)
+- Adapt idioms, examples and references to the local culture, not just the words
+- Preserve product names, code and {placeholders}
+- Flag anything needing human/legal review
+- Keep tone and intent consistent with the source
+""",
+    "data_cleaning": """
+- Describe the dataset shape (columns, types) and the tool (pandas / SQL / Excel)
+- List the exact steps: missing values, duplicates, types, outliers, formatting
+- Specify how to handle each (drop / impute / flag) — never silently change data
+- Do not mutate the original; output a cleaned copy + a change log
+- Define the expected output schema
+""",
+    "sql": """
+- Name the SQL dialect (PostgreSQL, MySQL, SQL Server, SQLite…)
+- Give the relevant table/column names and relationships
+- State the exact result columns, filters, grouping and ordering wanted
+- Require safe, readable SQL (explicit JOINs, no SELECT * in production)
+- Ask for a one-line explanation of what the query returns
+""",
+    "marketing_copy": """
+- Define the product, the audience, and the single desired action (CTA)
+- Specify channel/format (landing hero, ad, email subject, social post) and length
+- Set tone/brand voice with concrete adjectives; list words to avoid
+- Lead with the benefit; make claims specific, not generic hype
+- Provide the requested number of distinct variants
 """,
 }
 
