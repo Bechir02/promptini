@@ -7,6 +7,7 @@ from core.constants import ALLOWED_MODELS, ALLOWED_DEPTHS, DEFAULT_MODEL, DEFAUL
 from core.tasks import detect_task_type  # canonical classifier (re-exported)
 from core.templates import normalize_language
 from core.cache import LRUCache
+from core.metrics import metrics
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,7 @@ def run_pipeline(
     cached = _PIPELINE_CACHE.get(cache_key)
     if cached is not None:
         logger.info("Pipeline cache hit.")
+        metrics.incr("cache_hits")
         return dict(cached)
 
     task_type  = detect_task_type(raw_prompt)
@@ -73,10 +75,14 @@ def run_pipeline(
             "usage":       usage,
             "error":       None,
         }
+        metrics.incr("requests")
+        metrics.incr(f"provider.{provider.split()[0].lower() if provider else 'none'}")
+        metrics.observe("latency_s", elapsed)
         _PIPELINE_CACHE.set(cache_key, result)
         return result
 
     except Exception as e:
+        metrics.incr("errors")
         logger.exception("Transformation failed.")
         return {
             "transformed": "",

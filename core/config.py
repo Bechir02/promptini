@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     max_tokens: int = Field(default=1500, alias="PF_MAX_TOKENS")
     temperature: float = Field(default=0.4, alias="PF_TEMPERATURE")
 
+    # ── Rate limiting (per client, sliding window; <=0 disables) ─────────────
+    rate_limit_calls: int = Field(default=20, alias="PF_RATE_LIMIT_CALLS")
+    rate_limit_window: float = Field(default=60.0, alias="PF_RATE_LIMIT_WINDOW")
+
     # ── Paths ────────────────────────────────────────────────────────────────
     prompts_file: str = Field(default="prompts.json", alias="PF_PROMPTS_FILE")
     db_path: str = Field(default="lancedb_store", alias="PF_DB_PATH")

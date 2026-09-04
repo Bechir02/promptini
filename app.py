@@ -8,6 +8,7 @@ from pathlib import Path
 from scorer import score_transformation, format_score_html
 from core.constants import MODELS, DEPTHS
 from core.concurrency import map_ordered
+from core.ratelimit import RateLimiter
 from core.config import get_settings
 
 # Fail fast with a clear message if no provider key is configured.
@@ -24,6 +25,10 @@ else:
 # ── Status messages ───────────────────────────────────────────────────────────
 EMPTY_PROMPT_MSG = "Paste a rough prompt above, pick a model, and hit Forge."
 NO_MODEL_MSG = "Select at least one target model to forge for."
+RATE_LIMIT_MSG = "You're forging quickly — give it a few seconds and try again."
+
+_settings = get_settings()
+_LIMITER = RateLimiter(_settings.rate_limit_calls, _settings.rate_limit_window)
 
 
 def _empty_return(message: str):
@@ -49,11 +54,15 @@ def _begin(raw_prompt: str, target_models: list[str]):
     )
 
 
-def forge(raw_prompt: str, target_models: list[str], depth: str, language: str = "english"):
+def forge(raw_prompt: str, target_models: list[str], depth: str, language: str = "english", request: gr.Request | None = None):
     if not raw_prompt or not raw_prompt.strip():
         return _empty_return(EMPTY_PROMPT_MSG)
     if not target_models:
         return _empty_return(NO_MODEL_MSG)
+
+    client_id = request.client.host if (request and request.client) else "anon"
+    if not _LIMITER.allow(client_id):
+        return _empty_return(RATE_LIMIT_MSG)
 
     # limit to 2 for arena
     selected_models = target_models[:2]
