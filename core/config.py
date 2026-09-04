@@ -24,6 +24,14 @@ class Settings(BaseSettings):
     cerebras_api_key: str = Field(default="", alias="CEREBRAS_API_KEY")
     github_token: str = Field(default="", alias="GITHUB_TOKEN")
 
+    # ── Optional extra providers (OpenAI-compatible; used only if key set) ────
+    openrouter_api_key: str = Field(default="", alias="OPENROUTER_API_KEY")
+    together_api_key: str = Field(default="", alias="TOGETHER_API_KEY")
+    google_api_key: str = Field(default="", alias="GOOGLE_API_KEY")
+    openrouter_model: str = Field(default="meta-llama/llama-3.3-70b-instruct", alias="OPENROUTER_MODEL")
+    together_model: str = Field(default="meta-llama/Llama-3.3-70B-Instruct-Turbo", alias="TOGETHER_MODEL")
+    google_model: str = Field(default="gemini-1.5-flash", alias="GOOGLE_MODEL")
+
     # ── Model names ──────────────────────────────────────────────────────────
     groq_model: str = Field(default="llama-3.3-70b-versatile", alias="GROQ_MODEL")
     cerebras_model: str = Field(default="llama3.1-8b", alias="CEREBRAS_MODEL")
@@ -41,7 +49,10 @@ class Settings(BaseSettings):
 
     @property
     def has_any_provider(self) -> bool:
-        return bool(self.groq_api_key or self.cerebras_api_key)
+        return bool(
+            self.groq_api_key or self.cerebras_api_key or self.openrouter_api_key
+            or self.together_api_key or self.google_api_key
+        )
 
     def require_provider(self) -> None:
         """Raise a clear error at startup if no provider key is configured."""

@@ -1,4 +1,5 @@
 import logging
+import time
 from dotenv import load_dotenv
 load_dotenv()
 from groq import Groq
@@ -14,6 +15,95 @@ _settings = get_settings()
 # Only Groq (primary) and Cerebras (fallback) are supported, by design.
 GROQ_MODEL     = _settings.groq_model
 CEREBRAS_MODEL = _settings.cerebras_model
+
+# ── Optional OpenAI-compatible providers (used only when their key is set) ─────
+OPENROUTER_BASE = "https://openrouter.ai/api/v1"
+TOGETHER_BASE   = "https://api.together.xyz/v1"
+GOOGLE_BASE     = "https://generativelanguage.googleapis.com/v1beta/openai/"
+
+_TRANSIENT_MARKERS = (
+    "429", "rate limit", "rate_limit", "timeout", "timed out", "temporarily",
+    "overloaded", "500", "502", "503", "504", "unavailable", "connection reset",
+)
+
+
+def _is_transient(err: Exception) -> bool:
+    """True for errors worth retrying (rate limits, 5xx, timeouts)."""
+    msg = str(err).lower()
+    return any(m in msg for m in _TRANSIENT_MARKERS)
+
+
+def _retry(fn, *args, retries: int = 2, base_delay: float = 0.6, **kwargs):
+    """Call ``fn`` with exponential backoff on transient errors only."""
+    attempt = 0
+    while True:
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:
+            attempt += 1
+            if attempt > retries or not _is_transient(e):
+                raise
+            delay = base_delay * (2 ** (attempt - 1))
+            logger.warning("Transient error (%s) — retry %d/%d in %.1fs", e, attempt, retries, delay)
+            time.sleep(delay)
+
+
+def _openai_compatible(base_url: str, api_key: str, model: str,
+                       system_prompt: str, user_prompt: str) -> tuple[str, dict]:
+    """Call any OpenAI-compatible chat endpoint (OpenRouter / Together / Google)."""
+    from openai import OpenAI  # lazy: only needed if such a provider is configured
+    client = OpenAI(api_key=api_key, base_url=base_url)
+    resp = client.chat.completions.create(
+        model    = model,
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user",   "content": user_prompt},
+        ],
+        max_tokens  = _settings.max_tokens,
+        temperature = _settings.temperature,
+    )
+    u = resp.usage
+    usage = {
+        "prompt_tokens":     getattr(u, "prompt_tokens", 0),
+        "completion_tokens": getattr(u, "completion_tokens", 0),
+        "total_tokens":      getattr(u, "total_tokens", 0),
+    }
+    return resp.choices[0].message.content.strip(), usage
+
+
+def build_provider_order(settings) -> list[str]:
+    """Ordered list of provider names to try, based on which keys are set."""
+    order = []
+    if settings.groq_api_key:       order.append("groq")
+    if settings.cerebras_api_key:   order.append("cerebras")
+    if settings.openrouter_api_key: order.append("openrouter")
+    if settings.together_api_key:   order.append("together")
+    if settings.google_api_key:     order.append("google")
+    return order
+
+
+def _provider_model(name: str) -> str:
+    return {
+        "groq":       GROQ_MODEL,
+        "cerebras":   CEREBRAS_MODEL,
+        "openrouter": _settings.openrouter_model,
+        "together":   _settings.together_model,
+        "google":     _settings.google_model,
+    }.get(name, name)
+
+
+def _call_provider(name: str, system_prompt: str, user_prompt: str) -> tuple[str, dict]:
+    if name == "groq":
+        return call_groq(system_prompt, user_prompt)
+    if name == "cerebras":
+        return call_cerebras(system_prompt, user_prompt)
+    if name == "openrouter":
+        return _openai_compatible(OPENROUTER_BASE, _settings.openrouter_api_key, _settings.openrouter_model, system_prompt, user_prompt)
+    if name == "together":
+        return _openai_compatible(TOGETHER_BASE, _settings.together_api_key, _settings.together_model, system_prompt, user_prompt)
+    if name == "google":
+        return _openai_compatible(GOOGLE_BASE, _settings.google_api_key, _settings.google_model, system_prompt, user_prompt)
+    raise ValueError(f"Unknown provider: {name}")
 
 # ── Build system prompt ───────────────────────────────────────────────────────
 def build_system_prompt(
@@ -167,21 +257,20 @@ def transform_prompt(
     )
     user_message = f"Raw prompt to transform:\n\n{raw_prompt}"
 
-    try:
-        result, usage = call_groq(system_prompt, user_message)
-        return result, f"Groq ({GROQ_MODEL})", usage
-    except Exception as e:
-        logger.warning("Groq failed: %s — falling back to Cerebras...", e)
+    order = build_provider_order(_settings)
+    if not order:
+        raise RuntimeError("No LLM provider configured. Set GROQ_API_KEY and/or CEREBRAS_API_KEY.")
 
-    try:
-        result, usage = call_cerebras(system_prompt, user_message)
-        return result, f"Cerebras ({CEREBRAS_MODEL})", usage
-    except Exception as e:
-        raise RuntimeError(
-            f"Both Groq and Cerebras failed.\n"
-            f"Last error: {e}\n"
-            f"Check your API keys in HF Space Secrets."
-        )
+    last_err = None
+    for name in order:
+        try:
+            result, usage = _retry(_call_provider, name, system_prompt, user_message)
+            return result, f"{name} ({_provider_model(name)})", usage
+        except Exception as e:
+            last_err = e
+            logger.warning("Provider %s failed: %s — trying next.", name, e)
+
+    raise RuntimeError(f"All providers failed ({', '.join(order)}). Last error: {last_err}")
 
 
 def _route_model(model: str | None) -> tuple[str, str | None]:
@@ -217,9 +306,9 @@ def call_llm(prompt: str, model: str = "groq", response_format: str = "text") ->
     )
 
     try:
-        res, _ = primary(system, prompt, model=model_name)
+        res, _ = _retry(primary, system, prompt, model=model_name)
         return res
     except Exception as e:
         logger.warning("Primary provider (%s) failed: %s — trying fallback.", provider, e)
-        res, _ = secondary(system, prompt)
+        res, _ = _retry(secondary, system, prompt)
         return res
