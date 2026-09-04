@@ -7,6 +7,7 @@ from ingest import build_index
 from pathlib import Path
 from scorer import score_transformation, format_score_html
 from core.constants import MODELS, DEPTHS
+from core.concurrency import map_ordered
 from core.config import get_settings
 
 # Fail fast with a clear message if no provider key is configured.
@@ -58,11 +59,13 @@ def forge(raw_prompt: str, target_models: list[str], depth: str, language: str =
     selected_models = target_models[:2]
     is_arena = len(selected_models) > 1
 
-    results = []
-    for model_name in selected_models:
+    def _run_one(model_name: str) -> dict:
         res = run_pipeline(raw_prompt=raw_prompt, target_model=model_name, depth=depth, language=language)
         score_res = score_transformation(raw_prompt, res["transformed"], model_name, res["task_type"])
-        results.append({"res": res, "score": score_res, "model": model_name})
+        return {"res": res, "score": score_res, "model": model_name}
+
+    # Run the (up to two) model pipelines concurrently — they are independent I/O.
+    results = map_ordered(_run_one, selected_models, max_workers=2)
 
     # Outputs:
     # [out1, status1, score1, out2, status2, score2, arena_row_vis, battle_note, meta1, meta2, exemplars]
