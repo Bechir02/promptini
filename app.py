@@ -48,7 +48,7 @@ def _begin(raw_prompt: str, target_models: list[str]):
     )
 
 
-def forge(raw_prompt: str, target_models: list[str], depth: str):
+def forge(raw_prompt: str, target_models: list[str], depth: str, language: str = "english"):
     if not raw_prompt or not raw_prompt.strip():
         return _empty_return(EMPTY_PROMPT_MSG)
     if not target_models:
@@ -60,7 +60,7 @@ def forge(raw_prompt: str, target_models: list[str], depth: str):
 
     results = []
     for model_name in selected_models:
-        res = run_pipeline(raw_prompt=raw_prompt, target_model=model_name, depth=depth)
+        res = run_pipeline(raw_prompt=raw_prompt, target_model=model_name, depth=depth, language=language)
         score_res = score_transformation(raw_prompt, res["transformed"], model_name, res["task_type"])
         results.append({"res": res, "score": score_res, "model": model_name})
 
@@ -356,6 +356,17 @@ with gr.Blocks(title="Prompt Forge Arena", css=CSS) as demo:
                 value   = "standard",
                 label   = "Depth",
             )
+            language_dropdown = gr.Dropdown(
+                choices = [
+                    ("Auto — match input", "auto"),
+                    ("English", "english"),
+                    ("العربية · Arabic", "arabic"),
+                    ("Derja · تونسي", "derja"),
+                    ("Français", "french"),
+                ],
+                value   = "english",
+                label   = "Output language",
+            )
             forge_btn = gr.Button("⚡ Forge & Battle", variant="primary")
 
     # Battle Result Note
@@ -408,7 +419,7 @@ with gr.Blocks(title="Prompt Forge Arena", css=CSS) as demo:
         outputs=[status_1, status_2, col_2, arena_note_row],
     ).then(
         fn=forge,
-        inputs=[raw_input, model_dropdown, depth_dropdown],
+        inputs=[raw_input, model_dropdown, depth_dropdown, language_dropdown],
         outputs=[
             output_1, status_1, score_1,
             output_2, status_2, score_2,

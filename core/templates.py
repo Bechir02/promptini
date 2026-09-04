@@ -12,7 +12,7 @@ core.constants.MODELS / TASK_TYPES.
 
 from __future__ import annotations
 
-from .constants import MODELS, TASK_TYPES
+from .constants import MODELS, TASK_TYPES, OUTPUT_LANGUAGES, ALLOWED_LANGUAGES, DEFAULT_LANGUAGE
 
 REQUIRED_FORMAT_KEYS = ("format", "description", "example")
 
@@ -282,6 +282,53 @@ WHAT TO AVOID — these make prompts weak:
 """
 
 
+# ── Input: Tunisian Derja / Arabizi understanding (always injected) ────────────
+DERJA_INPUT_NOTE = """
+INPUT LANGUAGE NOTE:
+The user's raw prompt may be written in Tunisian Derja (Tunisian Arabic), or in
+"Arabizi" / franco-arabe (Derja written in Latin letters, often code-switched with
+French and English). Interpret it faithfully before optimizing. Common Arabizi
+digit substitutions: 3=ع, 7=ح, 9=ق, 5=خ, 2=ء (hamza), 8=غ, 6=ط. Treat mixed
+Derja + French + English in one sentence as normal. Never refuse or ask for a
+translation — infer the intent and proceed.
+"""
+
+# ── Output language directives ────────────────────────────────────────────────
+LANGUAGE_GUIDANCE: dict[str, str] = {
+    "auto": (
+        "Write the optimized prompt in the SAME language and script the user used in "
+        "their raw prompt (mirror their language and register). If they wrote in "
+        "Arabizi, prefer Arabic-script Derja unless they clearly want Latin script."
+    ),
+    "english": "Write the optimized prompt in clear, professional English.",
+    "arabic": (
+        "Write the optimized prompt in Modern Standard Arabic (الفصحى). Keep code, "
+        "placeholders like {var}, API names and technical identifiers in their "
+        "original English / Latin form."
+    ),
+    "derja": (
+        "Write the optimized prompt in natural, idiomatic Tunisian Derja (Tunisian "
+        "Arabic) in Arabic script. Keep code, placeholders like {var}, API names and "
+        "technical identifiers in their original English / Latin form."
+    ),
+    "french": "Write the optimized prompt in clear, professional French.",
+}
+
+
+def normalize_language(language: str | None) -> str:
+    """Return a valid output language, defaulting when unknown/empty."""
+    if not language:
+        return DEFAULT_LANGUAGE
+    lang = str(language).strip().lower()
+    return lang if lang in ALLOWED_LANGUAGES else DEFAULT_LANGUAGE
+
+
+def build_language_block(language: str | None) -> str:
+    """Render the OUTPUT LANGUAGE directive for the system prompt."""
+    lang = normalize_language(language)
+    return LANGUAGE_GUIDANCE.get(lang, LANGUAGE_GUIDANCE[DEFAULT_LANGUAGE])
+
+
 def validate_templates() -> list[str]:
     """Return a list of coverage/shape problems. Empty list == healthy.
 
@@ -303,6 +350,10 @@ def validate_templates() -> list[str]:
         if not TASK_GUIDANCE.get(task):
             problems.append(f"TASK_GUIDANCE missing task type: {task}")
 
+    for lang in OUTPUT_LANGUAGES:
+        if not LANGUAGE_GUIDANCE.get(lang):
+            problems.append(f"LANGUAGE_GUIDANCE missing language: {lang}")
+
     return problems
 
 
@@ -313,4 +364,4 @@ if __name__ == "__main__":
         for p in issues:
             print(f"  - {p}")
         raise SystemExit(1)
-    print(f"✅ Templates valid: {len(OUTPUT_FORMATS)} models, {len(TASK_GUIDANCE)} task types.")
+    print(f"✅ Templates valid: {len(OUTPUT_FORMATS)} models, {len(TASK_GUIDANCE)} task types, {len(LANGUAGE_GUIDANCE)} languages.")

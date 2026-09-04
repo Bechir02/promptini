@@ -3,8 +3,9 @@ import time
 
 from ingest import retrieve
 from llm import transform_prompt
-from core.constants import ALLOWED_MODELS, ALLOWED_DEPTHS, DEFAULT_MODEL, DEFAULT_DEPTH
+from core.constants import ALLOWED_MODELS, ALLOWED_DEPTHS, DEFAULT_MODEL, DEFAULT_DEPTH, DEFAULT_LANGUAGE
 from core.tasks import detect_task_type  # canonical classifier (re-exported)
+from core.templates import normalize_language
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +16,7 @@ def run_pipeline(
     raw_prompt:   str,
     target_model: str = "general",
     depth:        str = "standard",
+    language:     str = DEFAULT_LANGUAGE,
     top_k:        int = 3,
 ) -> dict:
 
@@ -24,6 +26,7 @@ def run_pipeline(
     if depth not in ALLOWED_DEPTHS:
         logger.warning("Invalid depth '%s' — defaulting to %s", depth, DEFAULT_DEPTH)
         depth = DEFAULT_DEPTH
+    language = normalize_language(language)
 
     task_type  = detect_task_type(raw_prompt)
     start_time = time.perf_counter()
@@ -48,6 +51,7 @@ def run_pipeline(
             task_type    = task_type,
             depth        = depth,
             exemplars    = exemplars,
+            language     = language,
         )
         elapsed = time.perf_counter() - start_time
         logger.info("Done — provider: %s | %.2fs", provider, elapsed)

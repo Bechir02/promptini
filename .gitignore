@@ -13,3 +13,6 @@ vscode-extension/*.vsix
 vscode-extension/*.png
 # Generated at runtime (rebuilt from prompts.json on first start)
 embedding_cache.pkl
+
+# Desktop app scratch (sent-file copies)
+Claude outputs/

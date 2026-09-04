@@ -5,7 +5,7 @@ from groq import Groq
 from cerebras.cloud.sdk import Cerebras
 
 from core.config import get_settings
-from core.templates import OUTPUT_FORMATS, TASK_GUIDANCE, ANTI_GENERIC
+from core.templates import OUTPUT_FORMATS, TASK_GUIDANCE, ANTI_GENERIC, DERJA_INPUT_NOTE, build_language_block
 
 logger = logging.getLogger(__name__)
 _settings = get_settings()
@@ -21,10 +21,12 @@ def build_system_prompt(
     task_type:    str,
     depth:        str,
     exemplars:    list[dict],
+    language:     str = "english",
 ) -> str:
 
     fmt        = OUTPUT_FORMATS.get(target_model, OUTPUT_FORMATS["general"])
     task_guide = TASK_GUIDANCE.get(task_type, TASK_GUIDANCE["general"])
+    language_block = build_language_block(language)
 
     depth_guidance = {
         "concise": (
@@ -62,6 +64,9 @@ def build_system_prompt(
 TARGET MODEL: {target_model}
 TASK TYPE: {task_type}
 DEPTH: {depth}
+{DERJA_INPUT_NOTE}
+━━━ OUTPUT LANGUAGE ━━━
+{language_block}
 
 ━━━ OUTPUT FORMAT FOR {target_model.upper()} ━━━
 {fmt['description']}
@@ -147,6 +152,7 @@ def transform_prompt(
     task_type:    str,
     depth:        str,
     exemplars:    list[dict],
+    language:     str = "english",
 ) -> tuple[str, str, dict]:
     """
     Returns (transformed_prompt, provider_name, usage_dict).
@@ -157,6 +163,7 @@ def transform_prompt(
         task_type    = task_type,
         depth        = depth,
         exemplars    = exemplars,
+        language     = language,
     )
     user_message = f"Raw prompt to transform:\n\n{raw_prompt}"
 

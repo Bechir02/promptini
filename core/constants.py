@@ -27,6 +27,13 @@ DEPTHS: list[str] = ["concise", "standard", "comprehensive"]
 ALLOWED_DEPTHS: frozenset[str] = frozenset(DEPTHS)
 DEFAULT_DEPTH: str = "standard"
 
+# ── Output languages ──────────────────────────────────────────────────────────
+# "auto" mirrors the user's input language. English is the default because target
+# models generally perform best with English prompts.
+OUTPUT_LANGUAGES: list[str] = ["auto", "english", "arabic", "derja", "french"]
+ALLOWED_LANGUAGES: frozenset[str] = frozenset(OUTPUT_LANGUAGES)
+DEFAULT_LANGUAGE: str = "english"
+
 # ── Task types ────────────────────────────────────────────────────────────────
 TASK_TYPES: list[str] = [
     "extraction",
