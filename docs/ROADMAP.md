@@ -6,6 +6,28 @@ Each item names the file(s) it touches and is independently shippable with tests
 
 ---
 
+## Build status (this session)
+
+**Shipped & committed** (one commit each, all tests green):
+A1 Derja input + output-language · A3 multilingual classifier · A6 Arabizi
+normalizer · A5 content-aware RTL · B1 +6 models · B2 +5 task types · B4 judge
+calibration · B5 actionable score hints · B6 chain mode · B7 YAML template
+overrides · C2 parallel arena · C3 provider resilience + extra providers ·
+C4 response cache · C5 incremental corpus (ETag) · C6 semantic dedup · C7 rate
+limit · C8 metrics · C9 FastAPI engine endpoint · A4 Derja/MENA seed corpus.
+
+**Enable when you're ready** (config/infra, no code owed):
+A2 multilingual embedder — set `PF_EMBEDDING_MODEL=BAAI/bge-m3` and re-embed
+(needs torch, done on your machine or the HF build). C1 fast cold-start cache —
+see `docs/DEPLOYMENT.md` (needs git-lfs on your machine).
+
+**Deferred (needs live testing, not built blind):**
+B8 streaming output — Gradio generator streaming for the arena's 11 outputs +
+battle judge carries real regression risk and can't be verified without a running
+Gradio + API keys. Build it in a session where we can run the app end-to-end.
+
+---
+
 ## Shipped this session (increment 1)
 
 - **Derja / Arabizi input understanding** — `llm.build_system_prompt` always
