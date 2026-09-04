@@ -300,6 +300,10 @@ button.secondary:hover { background: var(--pf-surface-2) !important; border-colo
   margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--pf-border-soft);
   font-size: 12px; color: var(--pf-ink-soft); line-height: 1.55;
 }
+.pf-score-hints { margin-top: 10px; }
+.pf-hint-label { display: block; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--pf-accent); margin-bottom: 4px; }
+.pf-score-hints ul { margin: 0; padding-left: 16px; }
+.pf-score-hints li { font-size: 11.5px; color: var(--pf-ink-soft); line-height: 1.5; }
 
 /* ── Toasts ── */
 #pf-toast-root {

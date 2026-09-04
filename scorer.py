@@ -242,6 +242,9 @@ def judge_battle(raw_prompt: str, output_a: str, model_a: str, output_b: str, mo
     1. Structure and clarity.
     2. Adherence to model-specific best practices.
     3. Removal of ambiguity.
+    4. Prefer an explicit output format and testable constraints over mere length.
+
+    Respond with ONLY a valid JSON object — no markdown fences, no commentary.
     
     Return a JSON object:
     {{
@@ -257,8 +260,16 @@ def judge_battle(raw_prompt: str, output_a: str, model_a: str, output_b: str, mo
         # Use the configured Groq model (previously hard-coded to a non-existent
         # "llama-3.1-70b-versatile" string that call_llm also ignored).
         response = call_llm(prompt, model="groq", response_format="json")
-        import json
-        return json.loads(response)
+        import json, re
+        match = re.search(r"\{.*\}", response, re.DOTALL)
+        data = json.loads(match.group(0) if match else response)
+        winner = str(data.get("winner", "A")).strip().upper()
+        return {
+            "winner":      winner if winner in ("A", "B") else "A",
+            "reasoning":   data.get("reasoning", ""),
+            "strengths_a": data.get("strengths_a", []),
+            "strengths_b": data.get("strengths_b", []),
+        }
     except Exception as e:
         return {
             "winner": "A",
@@ -408,6 +419,22 @@ def _esc(text: str) -> str:
     )
 
 
+def collect_fix_hints(score_result: dict) -> list[str]:
+    """Actionable suggestions from the heuristic breakdown (B5)."""
+    b = score_result["breakdown"]
+    hints: list[str] = []
+    missing = b["structure"].get("missing") or []
+    if missing:
+        hints.append("Add sections: " + ", ".join(missing[:4]))
+    vague = b["specificity"].get("vague_words") or []
+    if vague:
+        hints.append("Replace vague words: " + ", ".join(vague[:4]))
+    task_missing = b["task_cover"].get("missing") or []
+    if task_missing:
+        hints.append("Cover task elements: " + ", ".join(task_missing[:4]))
+    return hints
+
+
 def format_score_html(score_result: dict, reasoning: str = "") -> str:
     """Render a compact score card: grade chip + per-dimension bars + reasoning."""
     s = score_result
@@ -439,6 +466,12 @@ def format_score_html(score_result: dict, reasoning: str = "") -> str:
     if reasoning:
         reasoning_html = f'<div class="pf-score-reason">{_esc(reasoning)}</div>'
 
+    hints = collect_fix_hints(s)
+    hints_html = ""
+    if hints:
+        items = "".join(f"<li>{_esc(h)}</li>" for h in hints)
+        hints_html = f'<div class="pf-score-hints"><span class="pf-hint-label">Make it better</span><ul>{items}</ul></div>'
+
     return f"""
     <div class="pf-score-card">
       <div class="pf-score-head">
@@ -447,4 +480,5 @@ def format_score_html(score_result: dict, reasoning: str = "") -> str:
       </div>
       <div class="pf-score-bars">{bar_html}</div>
       {reasoning_html}
+      {hints_html}
     </div>"""

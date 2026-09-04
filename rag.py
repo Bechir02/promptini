@@ -6,8 +6,12 @@ from llm import transform_prompt
 from core.constants import ALLOWED_MODELS, ALLOWED_DEPTHS, DEFAULT_MODEL, DEFAULT_DEPTH, DEFAULT_LANGUAGE
 from core.tasks import detect_task_type  # canonical classifier (re-exported)
 from core.templates import normalize_language
+from core.cache import LRUCache
 
 logger = logging.getLogger(__name__)
+
+# Bounded in-process cache of successful pipeline results.
+_PIPELINE_CACHE = LRUCache(128)
 
 __all__ = ["detect_task_type", "run_pipeline"]
 
@@ -27,6 +31,12 @@ def run_pipeline(
         logger.warning("Invalid depth '%s' — defaulting to %s", depth, DEFAULT_DEPTH)
         depth = DEFAULT_DEPTH
     language = normalize_language(language)
+
+    cache_key = (raw_prompt, target_model, depth, language, top_k)
+    cached = _PIPELINE_CACHE.get(cache_key)
+    if cached is not None:
+        logger.info("Pipeline cache hit.")
+        return dict(cached)
 
     task_type  = detect_task_type(raw_prompt)
     start_time = time.perf_counter()
@@ -55,7 +65,7 @@ def run_pipeline(
         )
         elapsed = time.perf_counter() - start_time
         logger.info("Done — provider: %s | %.2fs", provider, elapsed)
-        return {
+        result = {
             "transformed": transformed,
             "provider":    provider,
             "task_type":   task_type,
@@ -63,6 +73,8 @@ def run_pipeline(
             "usage":       usage,
             "error":       None,
         }
+        _PIPELINE_CACHE.set(cache_key, result)
+        return result
 
     except Exception as e:
         logger.exception("Transformation failed.")
