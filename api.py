@@ -9,10 +9,13 @@ Run:  uvicorn api:app --host 0.0.0.0 --port 8000
 from dotenv import load_dotenv
 load_dotenv()
 
+import json
+
 from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from rag import run_pipeline
+from rag import run_pipeline, run_pipeline_stream
 from scorer import score_transformation
 from core.config import get_settings
 from core.metrics import metrics
@@ -54,3 +57,25 @@ def forge(req: ForgeRequest):
             req.prompt, res["transformed"], req.target_model, res["task_type"]
         )
     return out
+
+
+@app.post("/forge/stream")
+def forge_stream(req: ForgeRequest):
+    """Server-Sent Events: streams the optimized prompt token-by-token."""
+    def gen():
+        try:
+            for part in run_pipeline_stream(
+                raw_prompt=req.prompt, target_model=req.target_model,
+                depth=req.depth, language=req.language,
+            ):
+                payload = {
+                    "transformed": part["transformed"],
+                    "provider":    part["provider"],
+                    "done":        part.get("done", False),
+                    "error":       part.get("error"),
+                }
+                yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e), 'done': True})}\n\n"
+
+    return StreamingResponse(gen(), media_type="text/event-stream")

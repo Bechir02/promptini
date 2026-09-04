@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 # Bounded in-process cache of successful pipeline results.
 _PIPELINE_CACHE = LRUCache(128)
 
-__all__ = ["detect_task_type", "run_pipeline"]
+__all__ = ["detect_task_type", "run_pipeline", "run_pipeline_stream"]
 
 
 def run_pipeline(
@@ -94,6 +94,74 @@ def run_pipeline(
             "usage":       {},
             "error":       str(e),
         }
+
+
+def run_pipeline_stream(
+    raw_prompt:   str,
+    target_model: str = "general",
+    depth:        str = "standard",
+    language:     str = DEFAULT_LANGUAGE,
+    chain:        bool = False,
+    top_k:        int = 3,
+):
+    """Streaming variant of run_pipeline.
+
+    Yields partial result dicts {transformed, provider, task_type, exemplars,
+    error, done}; the final yield has done=True and is cached.
+    """
+    if target_model not in ALLOWED_MODELS:
+        target_model = DEFAULT_MODEL
+    if depth not in ALLOWED_DEPTHS:
+        depth = DEFAULT_DEPTH
+    language = normalize_language(language)
+
+    cache_key = (raw_prompt, target_model, depth, language, chain, top_k)
+    cached = _PIPELINE_CACHE.get(cache_key)
+    if cached is not None:
+        metrics.incr("cache_hits")
+        final = dict(cached)
+        final["done"] = True
+        yield final
+        return
+
+    task_type = detect_task_type(raw_prompt)
+    try:
+        exemplars = retrieve(query=raw_prompt, target_model=target_model, task_type=task_type, top_k=top_k)
+    except Exception:
+        logger.exception("Retrieval failed — proceeding without exemplars.")
+        exemplars = []
+
+    from llm import transform_prompt_stream
+    start = time.perf_counter()
+    acc, provider = "", "none"
+    try:
+        for acc, provider in transform_prompt_stream(
+            raw_prompt, target_model, task_type, depth, exemplars, language, chain
+        ):
+            yield {
+                "transformed": acc, "provider": provider, "task_type": task_type,
+                "exemplars": exemplars, "usage": {}, "error": None, "done": False,
+            }
+    except Exception as e:
+        metrics.incr("errors")
+        logger.exception("Streaming transformation failed.")
+        yield {
+            "transformed": acc, "provider": provider, "task_type": task_type,
+            "exemplars": exemplars, "usage": {}, "error": str(e), "done": True,
+        }
+        return
+
+    result = {
+        "transformed": acc, "provider": provider, "task_type": task_type,
+        "exemplars": exemplars, "usage": {}, "error": None,
+    }
+    metrics.incr("requests")
+    metrics.incr(f"provider.{provider.split()[0].lower() if provider else 'none'}")
+    metrics.observe("latency_s", time.perf_counter() - start)
+    _PIPELINE_CACHE.set(cache_key, result)
+    final = dict(result)
+    final["done"] = True
+    yield final
 
 
 if __name__ == "__main__":

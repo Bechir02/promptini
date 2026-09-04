@@ -278,6 +278,99 @@ def transform_prompt(
     raise RuntimeError(f"All providers failed ({', '.join(order)}). Last error: {last_err}")
 
 
+# ── Streaming (B8) ────────────────────────────────────────────────────────────
+def call_groq_stream(system_prompt: str, user_prompt: str, model: str | None = None):
+    if not _settings.groq_api_key:
+        raise ValueError("GROQ_API_KEY not set.")
+    client = Groq(api_key=_settings.groq_api_key)
+    stream = client.chat.completions.create(
+        model    = model or GROQ_MODEL,
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user",   "content": user_prompt},
+        ],
+        max_tokens  = _settings.max_tokens,
+        temperature = _settings.temperature,
+        stream      = True,
+    )
+    for chunk in stream:
+        delta = chunk.choices[0].delta.content
+        if delta:
+            yield delta
+
+
+def call_cerebras_stream(system_prompt: str, user_prompt: str, model: str | None = None):
+    if not _settings.cerebras_api_key:
+        raise ValueError("CEREBRAS_API_KEY not set.")
+    client = Cerebras(api_key=_settings.cerebras_api_key)
+    stream = client.chat.completions.create(
+        model    = model or CEREBRAS_MODEL,
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user",   "content": user_prompt},
+        ],
+        max_tokens = _settings.max_tokens,
+        stream     = True,
+    )
+    for chunk in stream:
+        delta = getattr(chunk.choices[0].delta, "content", None)
+        if delta:
+            yield delta
+
+
+_STREAMERS = {"groq": call_groq_stream, "cerebras": call_cerebras_stream}
+
+
+def transform_prompt_stream(
+    raw_prompt:   str,
+    target_model: str,
+    task_type:    str,
+    depth:        str,
+    exemplars:    list[dict],
+    language:     str = "english",
+    chain:        bool = False,
+):
+    """Yield (accumulated_text, provider_label) as tokens arrive.
+
+    Streams via Groq/Cerebras; if only non-streaming (OpenAI-compatible) providers
+    are configured, falls back to a single non-streamed yield.
+    """
+    system_prompt = build_system_prompt(
+        target_model = target_model,
+        task_type    = task_type,
+        depth        = depth,
+        exemplars    = exemplars,
+        language     = language,
+        chain        = chain,
+    )
+    user_message = f"Raw prompt to transform:\n\n{raw_prompt}"
+
+    order = build_provider_order(_settings)
+    streamable = [n for n in order if n in _STREAMERS]
+
+    if not streamable:
+        result, provider, _ = transform_prompt(
+            raw_prompt, target_model, task_type, depth, exemplars, language, chain
+        )
+        yield result, provider
+        return
+
+    last_err = None
+    for name in streamable:
+        try:
+            acc = ""
+            label = f"{name} ({_provider_model(name)})"
+            for delta in _STREAMERS[name](system_prompt, user_message):
+                acc += delta
+                yield acc, label
+            return
+        except Exception as e:
+            last_err = e
+            logger.warning("Stream provider %s failed: %s — trying next.", name, e)
+
+    raise RuntimeError(f"All streaming providers failed. Last error: {last_err}")
+
+
 def _route_model(model: str | None) -> tuple[str, str | None]:
     """Parse a model spec into (provider, model_name).
 

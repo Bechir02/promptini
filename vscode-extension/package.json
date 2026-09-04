@@ -50,6 +50,10 @@
       {
         "command": "promptForge.forgeSelection",
         "title": "Prompt Forge: Forge Selection"
+      },
+      {
+        "command": "promptForge.forgeSelectionApi",
+        "title": "Prompt Forge: Forge Selection via API"
       }
     ],
     "menus": {
@@ -57,6 +61,11 @@
         {
           "when": "editorHasSelection",
           "command": "promptForge.forgeSelection",
+          "group": "1_modification"
+        },
+        {
+          "when": "editorHasSelection",
+          "command": "promptForge.forgeSelectionApi",
           "group": "1_modification"
         }
       ]
@@ -82,6 +91,16 @@
           "type": "string",
           "default": "",
           "description": "Optional absolute path to a Python interpreter for Local mode. Leave empty to auto-detect a .venv in the workspace, otherwise system python3 is used."
+        },
+        "promptForge.apiUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:8000",
+          "description": "Base URL of the Prompt Forge FastAPI engine (api.py) for 'Forge Selection via API'."
+        },
+        "promptForge.apiModel": {
+          "type": "string",
+          "default": "general",
+          "description": "Target model used by 'Forge Selection via API'."
         }
       }
     }

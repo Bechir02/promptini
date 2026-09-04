@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import gradio as gr
-from rag import run_pipeline
+from rag import run_pipeline, run_pipeline_stream
 from ingest import build_index
 from pathlib import Path
 from scorer import score_transformation, format_score_html
@@ -54,69 +54,98 @@ def _begin(raw_prompt: str, target_models: list[str]):
     )
 
 
-def forge(raw_prompt: str, target_models: list[str], depth: str, language: str = "english", chain: bool = False, request: gr.Request | None = None):
-    if not raw_prompt or not raw_prompt.strip():
-        return _empty_return(EMPTY_PROMPT_MSG)
-    if not target_models:
-        return _empty_return(NO_MODEL_MSG)
+def _fmt_exemplars(exemplars) -> str:
+    if not exemplars:
+        return "No exemplars found for this query."
+    return "\n\n".join(
+        f"EXAMPLE {i+1}  [{ex['target_model']}]\n{ex['prompt'][:200]}…"
+        for i, ex in enumerate(exemplars)
+    )
 
-    client_id = request.client.host if (request and request.client) else "anon"
-    if not _LIMITER.allow(client_id):
-        return _empty_return(RATE_LIMIT_MSG)
 
-    # limit to 2 for arena
-    selected_models = target_models[:2]
-    is_arena = len(selected_models) > 1
+def _run_one(raw_prompt: str, model_name: str, depth: str, language: str, chain: bool) -> dict:
+    res = run_pipeline(raw_prompt=raw_prompt, target_model=model_name, depth=depth, language=language, chain=chain)
+    score_res = score_transformation(raw_prompt, res["transformed"], model_name, res["task_type"])
+    return {"res": res, "score": score_res, "model": model_name}
 
-    def _run_one(model_name: str) -> dict:
-        res = run_pipeline(raw_prompt=raw_prompt, target_model=model_name, depth=depth, language=language, chain=chain)
-        score_res = score_transformation(raw_prompt, res["transformed"], model_name, res["task_type"])
-        return {"res": res, "score": score_res, "model": model_name}
 
-    # Run the (up to two) model pipelines concurrently — they are independent I/O.
-    results = map_ordered(_run_one, selected_models, max_workers=2)
-
-    # Outputs:
-    # [out1, status1, score1, out2, status2, score2, arena_row_vis, battle_note, meta1, meta2, exemplars]
+def _arena_outputs(results, raw_prompt, selected_models):
     out1 = results[0]["res"]["transformed"]
     status1 = f"✓ {results[0]['model']} · {results[0]['score']['overall']}/10 · {results[0]['res']['task_type']}"
     score1 = format_score_html(results[0]["score"], results[0]["score"]["breakdown"]["llm_judge"]["note"])
     meta1 = f"{len(out1)} chars · {len(out1.split())} words"
 
-    out2, status2, score2, meta2 = "", "", "", ""
-    battle_note = ""
-    arena_vis = gr.update(visible=False)
+    out2 = results[1]["res"]["transformed"]
+    status2 = f"✓ {results[1]['model']} · {results[1]['score']['overall']}/10 · {results[1]['res']['task_type']}"
+    score2 = format_score_html(results[1]["score"], results[1]["score"]["breakdown"]["llm_judge"]["note"])
+    meta2 = f"{len(out2)} chars · {len(out2.split())} words"
 
-    if is_arena:
-        arena_vis = gr.update(visible=True)
-        out2 = results[1]["res"]["transformed"]
-        status2 = f"✓ {results[1]['model']} · {results[1]['score']['overall']}/10 · {results[1]['res']['task_type']}"
-        score2 = format_score_html(results[1]["score"], results[1]["score"]["breakdown"]["llm_judge"]["note"])
-        meta2 = f"{len(out2)} chars · {len(out2.split())} words"
-
-        # Run battle judge
-        from scorer import judge_battle
-        battle = judge_battle(raw_prompt, out1, selected_models[0], out2, selected_models[1])
-        winner_model = selected_models[0] if battle["winner"] == "A" else selected_models[1]
-        battle_note = (
-            f"### 🏆 Winner: Version {battle['winner']} — {winner_model}\n\n"
-            f"{battle['reasoning']}"
-        )
-
-    # Format exemplars
-    exemplars_str = "No exemplars found for this query."
-    if results[0]["res"].get("exemplars"):
-        ex_list = [
-            f"EXAMPLE {i+1}  [{ex['target_model']}]\n{ex['prompt'][:200]}…"
-            for i, ex in enumerate(results[0]["res"]["exemplars"])
-        ]
-        exemplars_str = "\n\n".join(ex_list)
+    from scorer import judge_battle
+    battle = judge_battle(raw_prompt, out1, selected_models[0], out2, selected_models[1])
+    winner_model = selected_models[0] if battle["winner"] == "A" else selected_models[1]
+    battle_note = f"### 🏆 Winner: Version {battle['winner']} — {winner_model}\n\n{battle['reasoning']}"
 
     return (
         out1, status1, score1,
         out2, status2, score2,
-        arena_vis, battle_note,
-        meta1, meta2, exemplars_str,
+        gr.update(visible=True), battle_note,
+        meta1, meta2, _fmt_exemplars(results[0]["res"].get("exemplars")),
+    )
+
+
+def forge(raw_prompt: str, target_models: list[str], depth: str, language: str = "english", chain: bool = False, request: gr.Request | None = None):
+    if not raw_prompt or not raw_prompt.strip():
+        yield _empty_return(EMPTY_PROMPT_MSG)
+        return
+    if not target_models:
+        yield _empty_return(NO_MODEL_MSG)
+        return
+
+    client_id = request.client.host if (request and request.client) else "anon"
+    if not _LIMITER.allow(client_id):
+        yield _empty_return(RATE_LIMIT_MSG)
+        return
+
+    selected_models = target_models[:2]
+
+    # Arena (two models): run in parallel and emit once.
+    if len(selected_models) > 1:
+        results = map_ordered(
+            lambda m: _run_one(raw_prompt, m, depth, language, chain),
+            selected_models, max_workers=2,
+        )
+        yield _arena_outputs(results, raw_prompt, selected_models)
+        return
+
+    # Single model: stream token-by-token (B8).
+    model = selected_models[0]
+    acc, task_type, exemplars = "", "", []
+    for part in run_pipeline_stream(raw_prompt, model, depth, language, chain):
+        acc = part["transformed"]
+        task_type = part["task_type"]
+        exemplars = part.get("exemplars") or []
+        if part.get("error"):
+            yield _empty_return(f"⚠️ {part['error']}")
+            return
+        if part.get("done"):
+            break
+        yield (
+            acc, f"⚡ streaming · {model}…", "",
+            "", "", "",
+            gr.update(visible=False), "",
+            f"{len(acc)} chars", "", _fmt_exemplars(exemplars),
+        )
+
+    # Final: score the completed output.
+    score_res = score_transformation(raw_prompt, acc, model, task_type)
+    status = f"✓ {model} · {score_res['overall']}/10 · {task_type}"
+    score_html = format_score_html(score_res, score_res["breakdown"]["llm_judge"]["note"])
+    meta = f"{len(acc)} chars · {len(acc.split())} words"
+    yield (
+        acc, status, score_html,
+        "", "", "",
+        gr.update(visible=False), "",
+        meta, "", _fmt_exemplars(exemplars),
     )
 
 
@@ -538,4 +567,4 @@ with gr.Blocks(title="Prompt Forge Arena", css=CSS) as demo:
     """)
 
 if __name__ == "__main__":
-    demo.launch(ssr_mode=False)
+    demo.queue().launch(ssr_mode=False)

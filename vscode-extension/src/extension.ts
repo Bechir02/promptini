@@ -400,7 +400,47 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.showInformationMessage("Prompt Forge has been stopped.");
   });
 
-  context.subscriptions.push(openCommand, stopCommand, forgeSelectionCmd);
+  // "Forge Selection via API" — calls the local FastAPI engine (api.py)
+  const forgeApiCmd = vscode.commands.registerCommand("promptForge.forgeSelectionApi", async () => {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) { return; }
+    const selection = editor.document.getText(editor.selection);
+    if (!selection) {
+      vscode.window.showWarningMessage("Select some text to forge first.");
+      return;
+    }
+    const cfg = vscode.workspace.getConfiguration("promptForge");
+    const base = (cfg.get<string>("apiUrl") || "http://127.0.0.1:8000").replace(/\/$/, "");
+    const targetModel = cfg.get<string>("apiModel") || "general";
+    const fetchFn: any = (globalThis as any).fetch;
+    try {
+      const result = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: "Prompt Forge: forging via API…" },
+        async () => {
+          const r = await fetchFn(`${base}/forge`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt: selection, target_model: targetModel, score: false }),
+          });
+          if (!r.ok) { throw new Error(`HTTP ${r.status}`); }
+          return await r.json();
+        }
+      );
+      const transformed = result && result.transformed;
+      if (!transformed) {
+        vscode.window.showErrorMessage("Prompt Forge API returned no prompt.");
+        return;
+      }
+      await editor.edit((ed) => ed.replace(editor.selection, transformed));
+      vscode.window.showInformationMessage("✨ Prompt forged via API.");
+    } catch (err: any) {
+      vscode.window.showErrorMessage(
+        `Prompt Forge API error: ${err?.message ?? err}. Is the engine running (uvicorn api:app)?`
+      );
+    }
+  });
+
+  context.subscriptions.push(openCommand, stopCommand, forgeSelectionCmd, forgeApiCmd);
 }
 
 export function deactivate() {
