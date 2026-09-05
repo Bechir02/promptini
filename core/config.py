@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     google_model: str = Field(default="gemini-2.5-flash", alias="GOOGLE_MODEL")
 
     # ── Model names ──────────────────────────────────────────────────────────
-    groq_model: str = Field(default="llama-3.3-70b-versatile", alias="GROQ_MODEL")
+    groq_model: str = Field(default="openai/gpt-oss-120b", alias="GROQ_MODEL")
     cerebras_model: str = Field(default="llama3.1-8b", alias="CEREBRAS_MODEL")
 
     # ── LLM call params ──────────────────────────────────────────────────────

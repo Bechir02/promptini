@@ -482,3 +482,39 @@ def format_score_html(score_result: dict, reasoning: str = "") -> str:
       {reasoning_html}
       {hints_html}
     </div>"""
+
+def pick_best(raw_prompt: str, candidates: list, target_model: str) -> int:
+    """Internal LLM judge: return the 0-based index of the best candidate prompt.
+
+    Reads the raw input and all candidate optimized prompts, and selects the single
+    best one for the user's intent. Used for best-of-N selection (no score shown).
+    """
+    if not candidates:
+        return 0
+    if len(candidates) == 1:
+        return 0
+    n = len(candidates)
+    blocks = "\n\n".join(f"CANDIDATE {i + 1}:\n{c}" for i, c in enumerate(candidates))
+    prompt = f"""You are an expert prompt engineer choosing the single best optimized prompt.
+
+RAW USER INPUT:
+{raw_prompt}
+
+TARGET MODEL: {target_model}
+
+{blocks}
+
+Choose the ONE best candidate for the user's real intent. Judge by: correct format for
+the target model; RESTRAINT (no invented requirements, constraints, or edge-cases the
+user never asked for); clarity; and concrete, testable constraints. When quality is
+equal, prefer the shorter, tighter prompt.
+
+Respond with ONLY JSON, no prose: {{"best": <integer from 1 to {n}>}}"""
+    try:
+        from llm import call_llm
+        resp = call_llm(prompt, model="groq", response_format="json")
+        m = re.search(r'"best"\s*:\s*(\d+)', resp) or re.search(r"\d+", resp)
+        idx = (int(m.group(1)) if (m and m.lastindex) else int(m.group(0)) if m else 1) - 1
+        return idx if 0 <= idx < len(candidates) else 0
+    except Exception:
+        return 0

@@ -1,7 +1,6 @@
 import logging
 import time
 
-from ingest import retrieve
 from llm import transform_prompt
 from core.constants import ALLOWED_MODELS, ALLOWED_DEPTHS, DEFAULT_MODEL, DEFAULT_DEPTH, DEFAULT_LANGUAGE
 from core.tasks import detect_task_type  # canonical classifier (re-exported)
@@ -45,17 +44,9 @@ def run_pipeline(
     start_time = time.perf_counter()
     logger.info("Task type: %s | Model: %s | Depth: %s", task_type, target_model, depth)
 
-    try:
-        exemplars = retrieve(
-            query        = raw_prompt,
-            target_model = target_model,
-            task_type    = task_type,
-            top_k        = top_k,
-        )
-        logger.info("Retrieved %d exemplars.", len(exemplars))
-    except Exception:
-        logger.exception("Retrieval failed — proceeding without exemplars.")
-        exemplars = []
+    # Retrieval disabled: scraped corpus was multilingual-contaminated.
+    # Derja + technical expertise now lives in the system prompt, not RAG.
+    exemplars = []
 
     try:
         transformed, provider, usage = transform_prompt(
@@ -125,11 +116,7 @@ def run_pipeline_stream(
         return
 
     task_type = detect_task_type(raw_prompt)
-    try:
-        exemplars = retrieve(query=raw_prompt, target_model=target_model, task_type=task_type, top_k=top_k)
-    except Exception:
-        logger.exception("Retrieval failed — proceeding without exemplars.")
-        exemplars = []
+    exemplars = []  # retrieval disabled (contaminated corpus)
 
     from llm import transform_prompt_stream
     start = time.perf_counter()

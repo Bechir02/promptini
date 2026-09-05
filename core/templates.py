@@ -22,7 +22,7 @@ REQUIRED_FORMAT_KEYS = ("format", "description", "example")
 OUTPUT_FORMATS: dict[str, dict[str, str]] = {
     "claude-code": {
         "format":      "xml",
-        "description": "XML tags only — <role>, <task>, <context>, <constraints>, <output_format>. No markdown headers. No bullet points outside tags.",
+        "description": "Clear, explicit, action-first instructions for a coding agent. Lead with the task; give the relevant files/context and WHY; state the exact output and one testable acceptance criterion. Use clean headings or light structure — heavy XML tags only for complex prompts (2026 Claude reads headings and whitespace fine). Let the model flag assumptions instead of guessing.",
         "example": """<role>
 You are a senior Python engineer working inside Claude Code.
 </role>
@@ -47,7 +47,7 @@ Followed by a one-line summary: "Found X duplicate rows."
 
     "claude": {
         "format":      "xml",
-        "description": "XML tags — <role>, <task>, <context>, <constraints>, <output_format>. Clear role. Explicit output format. Step-by-step reasoning for complex tasks.",
+        "description": "Explicit, specific instructions. State the role briefly, give context and WHY the constraints matter, be concrete about the output format, and allow the model to say when it is unsure. Structure with clear headings and whitespace — XML tags are optional and only help for complex prompts (per Anthropic's 2026 guidance). Add step-by-step reasoning for complex tasks.",
         "example": """<role>
 You are an expert data analyst.
 </role>
