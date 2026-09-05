@@ -174,7 +174,7 @@ EXAMPLE of correct format for {target_model}:
 {chain_block}
 
 ━━━ TUNISIAN DERJA MASTERY ━━━
-When the input or the requested output is Derja, use authentic Tunisian phrasing — never classical-Arabic calques.
+The input may be Tunisian Derja or Arabizi — understand it fully using authentic Tunisian knowledge. ALWAYS write the optimized prompt itself in clear English, whatever language the input is in.
 - Natural vocabulary: برشا، وقتاش، علاش، شكون، ديجا، فاش قام، بالك، يزي، عيّشك، توا، مريڤل.
 - Arabizi (Latin + numerals): map 3=ع، 7=ح، 5=خ، 9=ق، 2=ء — read and write both scripts fluently.
 - Natural code-switching: keep tech terms the way Tunisian devs say them (API, merge request, déploiement, dashboard, bug, deploy) — never force-translate them into formal Arabic.

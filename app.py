@@ -91,7 +91,7 @@ INIT_JS = """
 """
 
 # ── Forge (single model, internal best-of-N, no visible metrics) ──────────────
-def forge(raw_prompt, model, depth, language, request: gr.Request | None = None):
+def forge(raw_prompt, model, depth, request: gr.Request | None = None):
     if not raw_prompt or not raw_prompt.strip():
         yield "", EMPTY_PROMPT_MSG
         return
@@ -105,7 +105,7 @@ def forge(raw_prompt, model, depth, language, request: gr.Request | None = None)
 
     def _gen(_i):
         try:
-            txt, _prov, _u = transform_prompt(raw_prompt, model, task_type, depth, [], language, False)
+            txt, _prov, _u = transform_prompt(raw_prompt, model, task_type, depth, [], "english", False)
             return (txt or "").strip()
         except Exception as e:
             return f"__ERR__{e}"
@@ -148,11 +148,6 @@ with gr.Blocks(title="Promptini") as demo:
                     [("Concise", "concise"), ("Balanced", "standard"), ("Detailed", "comprehensive")],
                     value="standard", label="Depth",
                 )
-                language_dropdown = gr.Dropdown(
-                    [("Auto — match input", "auto"), ("English", "english"),
-                     ("العربية · Arabic", "arabic"), ("Derja · تونسي", "derja"), ("Français", "french")],
-                    value="auto", label="Language", elem_id="pf-lang",
-                )
             forge_btn = gr.Button("⚡ Forge", variant="primary", elem_classes="pf-forge")
             status = gr.Markdown("", elem_classes="pf-status")
 
@@ -161,7 +156,7 @@ with gr.Blocks(title="Promptini") as demo:
             copy_btn = gr.Button("📋 Copy prompt", elem_classes="pf-copy")
 
     forge_btn.click(fn=forge,
-                    inputs=[raw_input, model_dropdown, depth_dropdown, language_dropdown],
+                    inputs=[raw_input, model_dropdown, depth_dropdown],
                     outputs=[output, status])
     copy_btn.click(fn=None, inputs=output, js=COPY_JS)
     demo.load(None, None, None, js=INIT_JS)
