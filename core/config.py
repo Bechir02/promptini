@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     google_api_key: str = Field(default="", alias="GOOGLE_API_KEY")
     openrouter_model: str = Field(default="meta-llama/llama-3.3-70b-instruct", alias="OPENROUTER_MODEL")
     together_model: str = Field(default="meta-llama/Llama-3.3-70B-Instruct-Turbo", alias="TOGETHER_MODEL")
-    google_model: str = Field(default="gemini-1.5-flash", alias="GOOGLE_MODEL")
+    google_model: str = Field(default="gemini-2.5-flash", alias="GOOGLE_MODEL")
 
     # ── Model names ──────────────────────────────────────────────────────────
     groq_model: str = Field(default="llama-3.3-70b-versatile", alias="GROQ_MODEL")

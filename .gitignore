@@ -18,3 +18,4 @@ embedding_cache.pkl
 Claude outputs/
 .corpus_cache.json
 bench/results/
+*.bak

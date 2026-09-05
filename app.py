@@ -402,7 +402,7 @@ MIC_JS = """
 """
 
 # ── UI ────────────────────────────────────────────────────────────────────────
-with gr.Blocks(title="M3allem · المْعلّم", css=CSS) as demo:
+with gr.Blocks(title="M3allem · المْعلّم") as demo:
 
     # Header
     gr.HTML(f"""
@@ -610,4 +610,4 @@ with gr.Blocks(title="M3allem · المْعلّم", css=CSS) as demo:
     """)
 
 if __name__ == "__main__":
-    demo.queue().launch(ssr_mode=False)
+    demo.queue().launch(css=CSS, ssr_mode=False)
