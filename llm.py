@@ -266,16 +266,16 @@ def transform_prompt(
     if not order:
         raise RuntimeError("No LLM provider configured. Set GROQ_API_KEY and/or CEREBRAS_API_KEY.")
 
-    last_err = None
+    errors = []
     for name in order:
         try:
             result, usage = _retry(_call_provider, name, system_prompt, user_message)
             return result, f"{name} ({_provider_model(name)})", usage
         except Exception as e:
-            last_err = e
-            logger.warning("Provider %s failed: %s — trying next.", name, e)
+            errors.append(f"{name}({_provider_model(name)}): {e}")
+            logger.warning("Provider %s (%s) failed: %s — trying next.", name, _provider_model(name), e)
 
-    raise RuntimeError(f"All providers failed ({', '.join(order)}). Last error: {last_err}")
+    raise RuntimeError("All providers failed — " + " | ".join(errors))
 
 
 # ── Streaming (B8) ────────────────────────────────────────────────────────────
@@ -355,7 +355,7 @@ def transform_prompt_stream(
         yield result, provider
         return
 
-    last_err = None
+    errors = []
     for name in streamable:
         try:
             acc = ""
@@ -365,10 +365,10 @@ def transform_prompt_stream(
                 yield acc, label
             return
         except Exception as e:
-            last_err = e
-            logger.warning("Stream provider %s failed: %s — trying next.", name, e)
+            errors.append(f"{name}({_provider_model(name)}): {e}")
+            logger.warning("Stream provider %s (%s) failed: %s — trying next.", name, _provider_model(name), e)
 
-    raise RuntimeError(f"All streaming providers failed. Last error: {last_err}")
+    raise RuntimeError("All streaming providers failed — " + " | ".join(errors))
 
 
 def _route_model(model: str | None) -> tuple[str, str | None]:
