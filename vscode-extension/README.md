@@ -1,27 +1,27 @@
-# ⚡ Promptini — Derja Prompt Studio
+# Promptini
 
-Turn a rough idea — in **Tunisian Derja, Arabizi, Arabic, French, or English** — into a clean, **model-ready prompt**, right inside VS Code.
+Turn rough ideas — in Tunisian Derja, Arabic, French, or English into clean, model-ready prompts, without leaving VS Code.
 
-Promptini understands messy, code-switched developer input (the way people in Tunisia actually type) and rewrites it into a precise, structured, model-optimized prompt you can paste straight into Claude, ChatGPT, Gemini, Cursor, or Copilot.
+Promptini reads messy, code-switched input and rewrites it into a structured prompt you can paste into Claude, ChatGPT, Gemini, or Cursor. The optimized prompt always comes out in English.
 
 ## Features
 
-- **Derja-first** — understands authentic Tunisian Derja and Arabizi (`3→ع`, `7→ح`, `9→ق`).
-- **Model-aware** — formats the prompt for your target tool (Claude, ChatGPT, Gemini, Cursor, or Any).
-- **Always-English output** — the messy input can be any language; the optimized prompt comes out clean and English.
-- **One-click sidebar panel** — type a rough idea, hit **⚡ Promptini**, and copy the result.
-- **Forge Selection** — turn highlighted editor text into an optimized prompt via the engine API.
+- Understands Tunisian Derja and Arabizi (3→ع, 7→ح, 9→ق).
+- Formats the prompt for your target model: Claude, ChatGPT, Gemini, Cursor, or Any.
+- English output regardless of input language.
+- Sidebar panel: type an idea, run Promptini, copy the result.
+- Optimize Selection: turn highlighted editor text into an optimized prompt.
 
 ## Usage
 
-1. Click the **⚡ Promptini** icon in the Activity Bar.
-2. Type or paste a rough idea, pick a model, and hit **⚡ Promptini**.
-3. **Copy prompt** and paste it into your AI tool.
+1. Open the Promptini panel from the Activity Bar.
+2. Type or paste an idea, pick a target model, and run it.
+3. Copy the prompt into your AI tool.
 
-## Configuration
+## Settings
 
-- `promptForge.hfUrl` — the Promptini engine URL (defaults to the hosted cloud app).
-- `promptForge.mode` — `cloud` (hosted engine) or `local` (your own server).
-- `promptForge.apiUrl` / `promptForge.apiModel` — endpoint + target model for **Forge Selection**.
+- `promptini.hfUrl` — engine URL (defaults to the hosted app).
+- `promptini.mode` — `cloud` (hosted) or `local` (your own server).
+- `promptini.apiUrl` / `promptini.apiModel` — endpoint and target model for Optimize Selection.
 
-Built on a 100% free / open-source stack (Groq inference, Hugging Face hosting).
+Runs on a free, open-source stack: Groq inference, Hugging Face hosting.

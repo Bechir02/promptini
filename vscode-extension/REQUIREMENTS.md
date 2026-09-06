@@ -10,10 +10,10 @@
 - [x] Output channel logs the selected port
 
 ### 2. Explicit Stop Command
-- [x] New command `promptForge.stop` registered in manifest
-- [x] Function `stopPromptForge()` cleanly kills Python process
+- [x] New command `promptini.stop` registered in manifest
+- [x] Function `stopPromptini()` cleanly kills Python process
 - [x] Closes the Webview panel
-- [x] Resets internal state (`promptForgeProcess`, `currentPort`, `currentPanel`)
+- [x] Resets internal state (`promptiniProcess`, `currentPort`, `currentPanel`)
 - [x] Shows user confirmation message
 
 ### 3. .vsix Packaging
@@ -94,8 +94,8 @@ vscode-extension/
 | `isPortAvailable()` | Checks if a port is available |
 | `waitForServer()` | Polls until Gradio server is ready |
 | `getWebviewHtml()` | Generates Webview HTML with embedded iframe |
-| `launchPromptForge()` | Spawns Python process with port env var |
-| `stopPromptForge()` | Cleanly stops server and closes panel |
+| `launchPromptini()` | Spawns Python process with port env var |
+| `stopPromptini()` | Cleanly stops server and closes panel |
 | `choosePythonCommand()` | Selects `python3` or `python` by OS |
 
 ---
@@ -103,12 +103,12 @@ vscode-extension/
 ## 🎯 Command Palette Integration
 
 Two commands now available:
-1. **Prompt Forge: Open App** (`promptForge.open`)
+1. **Promptini: Open App** (`promptini.open`)
    - Finds available port
    - Launches Python server
    - Opens Webview
 
-2. **Prompt Forge: Stop App** (`promptForge.stop`)
+2. **Promptini: Stop App** (`promptini.stop`)
    - Kills Python process
    - Closes Webview
    - Cleans up state

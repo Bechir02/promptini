@@ -1,8 +1,8 @@
 {
   "name": "prompt-forge-vscode",
   "displayName": "Promptini",
-  "description": "Turn a rough idea in Tunisian Derja, Arabic, French, or English into a clean, model-ready prompt — for Claude, ChatGPT, Gemini, Cursor and more.",
-  "version": "0.9.1",
+  "description": "Turn rough ideas in Tunisian Derja, Arabic, French, or English into clean, model-ready prompts for Claude, ChatGPT, Gemini, and Cursor.",
+  "version": "1.0.0",
   "icon": "icon.png",
   "publisher": "BecherZribi",
   "repository": {
@@ -16,64 +16,64 @@
     "Other"
   ],
   "activationEvents": [
-    "onView:promptForgeView"
+    "onView:promptiniView"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "prompt-forge-container",
-          "title": "Prompt Forge",
+          "id": "promptini-container",
+          "title": "Promptini",
           "icon": "sidebar-icon.svg"
         }
       ]
     },
     "views": {
-      "prompt-forge-container": [
+      "promptini-container": [
         {
-          "id": "promptForgeView",
-          "name": "Prompt Forge",
+          "id": "promptiniView",
+          "name": "Promptini",
           "type": "webview"
         }
       ]
     },
     "commands": [
       {
-        "command": "promptForge.open",
-        "title": "Prompt Forge: Open App"
+        "command": "promptini.open",
+        "title": "Promptini: Open App"
       },
       {
-        "command": "promptForge.stop",
-        "title": "Prompt Forge: Stop App"
+        "command": "promptini.stop",
+        "title": "Promptini: Stop App"
       },
       {
-        "command": "promptForge.forgeSelection",
-        "title": "Prompt Forge: Forge Selection"
+        "command": "promptini.optimizeSelection",
+        "title": "Promptini: Optimize Selection"
       },
       {
-        "command": "promptForge.forgeSelectionApi",
-        "title": "Prompt Forge: Forge Selection via API"
+        "command": "promptini.optimizeSelectionApi",
+        "title": "Promptini: Optimize Selection via API"
       }
     ],
     "menus": {
       "editor/context": [
         {
           "when": "editorHasSelection",
-          "command": "promptForge.forgeSelection",
+          "command": "promptini.optimizeSelection",
           "group": "1_modification"
         },
         {
           "when": "editorHasSelection",
-          "command": "promptForge.forgeSelectionApi",
+          "command": "promptini.optimizeSelectionApi",
           "group": "1_modification"
         }
       ]
     },
     "configuration": {
-      "title": "Prompt Forge",
+      "title": "Promptini",
       "properties": {
-        "promptForge.mode": {
+        "promptini.mode": {
           "type": "string",
           "enum": [
             "cloud",
@@ -82,25 +82,25 @@
           "default": "cloud",
           "description": "Whether to use the Hugging Face Cloud version or a local Python server."
         },
-        "promptForge.hfUrl": {
+        "promptini.hfUrl": {
           "type": "string",
           "default": "https://becher-zribi-prompt-forge-rag.hf.space",
           "description": "The URL of your Hugging Face Space (if mode is set to cloud)."
         },
-        "promptForge.pythonPath": {
+        "promptini.pythonPath": {
           "type": "string",
           "default": "",
           "description": "Optional absolute path to a Python interpreter for Local mode. Leave empty to auto-detect a .venv in the workspace, otherwise system python3 is used."
         },
-        "promptForge.apiUrl": {
+        "promptini.apiUrl": {
           "type": "string",
           "default": "http://127.0.0.1:8000",
-          "description": "Base URL of the Prompt Forge FastAPI engine (api.py) for 'Forge Selection via API'."
+          "description": "Base URL of the Promptini FastAPI engine (api.py) for 'Optimize Selection via API'."
         },
-        "promptForge.apiModel": {
+        "promptini.apiModel": {
           "type": "string",
           "default": "general",
-          "description": "Target model used by 'Forge Selection via API'."
+          "description": "Target model used by 'Optimize Selection via API'."
         }
       }
     }
