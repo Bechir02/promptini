@@ -22,50 +22,36 @@ REQUIRED_FORMAT_KEYS = ("format", "description", "example")
 OUTPUT_FORMATS: dict[str, dict[str, str]] = {
     "claude-code": {
         "format":      "xml",
-        "description": "Clear, explicit, action-first instructions for a coding agent. Lead with the task; give the relevant files/context and WHY; state the exact output and one testable acceptance criterion. Use clean headings or light structure — heavy XML tags only for complex prompts (2026 Claude reads headings and whitespace fine). Let the model flag assumptions instead of guessing.",
-        "example": """<role>
-You are a senior Python engineer working inside Claude Code.
-</role>
-<task>
-Implement a CSV duplicate finder that returns a DataFrame of duplicate rows with counts.
-</task>
-<context>
-- File path: {csv_path}
-- Expected columns: {columns}
-</context>
-<constraints>
-- Use pandas for all operations
-- Handle encoding errors gracefully
-- Return empty DataFrame if no duplicates found
-- Do not modify the original file
-</constraints>
-<output_format>
-DataFrame with columns: ['duplicate_row', 'count']
-Followed by a one-line summary: "Found X duplicate rows."
-</output_format>""",
+        "description": "Markdown section headers only: # ROLE, # TASK, # REQUIREMENTS, # OUTPUT FORMAT, # CONSTRAINTS. One blank line between sections. Clear and action-first for a coding agent. No XML tags. Omit any section the request does not need.",
+        "example": """# ROLE
+Senior Python engineer.
+
+# TASK
+Implement a CSV duplicate finder that returns duplicate rows with their counts.
+
+# REQUIREMENTS
+1. Use pandas only; never modify the input file.
+2. Return an empty result (not an error) when there are no duplicates.
+
+# OUTPUT FORMAT
+One code block, then a one-line summary line stating how many duplicate rows were found.""",
     },
 
     "claude": {
         "format":      "xml",
-        "description": "Explicit, specific instructions. State the role briefly, give context and WHY the constraints matter, be concrete about the output format, and allow the model to say when it is unsure. Structure with clear headings and whitespace — XML tags are optional and only help for complex prompts (per Anthropic's 2026 guidance). Add step-by-step reasoning for complex tasks.",
-        "example": """<role>
-You are an expert data analyst.
-</role>
-<task>
-Analyze the provided dataset and identify the top 3 trends.
-</task>
-<context>
-- Dataset: {dataset_path}
-- Time period: {time_period}
-</context>
-<constraints>
-- Cite specific data points for each trend
-- Avoid speculation beyond the data
-- Use plain language suitable for non-technical stakeholders
-</constraints>
-<output_format>
-Three numbered trends, each with: trend name, supporting data, business implication.
-</output_format>""",
+        "description": "Markdown section headers: # ROLE, # TASK, # REQUIREMENTS, # OUTPUT FORMAT, # CONSTRAINTS, one blank line between them. Explicit and specific; give context and WHY when it matters. No XML tags. Omit sections the request does not need.",
+        "example": """# ROLE
+Expert data analyst.
+
+# TASK
+Analyze the dataset and identify the top 3 trends.
+
+# REQUIREMENTS
+1. Cite specific data points for each trend.
+2. No speculation beyond the data.
+
+# OUTPUT FORMAT
+Three numbered trends, each with: trend name, supporting data, business implication.""",
     },
 
     "gpt-4": {

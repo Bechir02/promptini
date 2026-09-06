@@ -1,81 +1,69 @@
-"""FastAPI engine endpoint (C9).
+"""Promptini FastAPI engine — serves the UI and the /forge endpoint.
 
-Exposes the pipeline over HTTP so the VS Code extension and other clients can
-call the engine directly, not only through the Gradio iframe.
-
-Run:  uvicorn api:app --host 0.0.0.0 --port 8000
+Run:  uvicorn api:app --host 0.0.0.0 --port 7860
 """
-
 from dotenv import load_dotenv
 load_dotenv()
 
-import json
+import os
 
 from fastapi import FastAPI
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from rag import run_pipeline, run_pipeline_stream
-from scorer import score_transformation
+from llm import transform_prompt
+from scorer import pick_best
+from core.tasks import detect_task_type
+from core.concurrency import map_ordered
 from core.config import get_settings
 from core.metrics import metrics
-from core.constants import DEFAULT_MODEL, DEFAULT_DEPTH, DEFAULT_LANGUAGE
 
-app = FastAPI(title="Prompt Forge Engine", version="1.0")
+BEST_OF = int(os.getenv("BEST_OF", "1"))  # 1 = fast/free-tier; raise if you upgrade Groq
+_HERE = os.path.dirname(os.path.abspath(__file__))
+
+app = FastAPI(title="Promptini", version="2.0")
 
 
 class ForgeRequest(BaseModel):
     prompt: str
-    target_model: str = DEFAULT_MODEL
-    depth: str = DEFAULT_DEPTH
-    language: str = DEFAULT_LANGUAGE
-    score: bool = True
+    target_model: str = "claude-code"
+    depth: str = "standard"
+    language: str = "english"
+
+
+@app.get("/")
+def index():
+    return FileResponse(os.path.join(_HERE, "web", "index.html"))
 
 
 @app.get("/health")
 def health():
     s = get_settings()
-    return {"ok": s.has_any_provider, "metrics": metrics.snapshot()}
+    return {"ok": getattr(s, "has_any_provider", True), "metrics": metrics.snapshot()}
 
 
 @app.post("/forge")
 def forge(req: ForgeRequest):
-    res = run_pipeline(
-        raw_prompt=req.prompt,
-        target_model=req.target_model,
-        depth=req.depth,
-        language=req.language,
-    )
-    out = {
-        "transformed": res["transformed"],
-        "provider":    res["provider"],
-        "task_type":   res["task_type"],
-        "error":       res["error"],
-    }
-    if req.score and res["transformed"]:
-        out["score"] = score_transformation(
-            req.prompt, res["transformed"], req.target_model, res["task_type"]
-        )
-    return out
+    prompt = (req.prompt or "").strip()
+    if not prompt:
+        return {"transformed": "", "error": "empty prompt", "task_type": ""}
 
+    task_type = detect_task_type(prompt)
+    lang = req.language or "english"
 
-@app.post("/forge/stream")
-def forge_stream(req: ForgeRequest):
-    """Server-Sent Events: streams the optimized prompt token-by-token."""
-    def gen():
+    def _gen(_i):
         try:
-            for part in run_pipeline_stream(
-                raw_prompt=req.prompt, target_model=req.target_model,
-                depth=req.depth, language=req.language,
-            ):
-                payload = {
-                    "transformed": part["transformed"],
-                    "provider":    part["provider"],
-                    "done":        part.get("done", False),
-                    "error":       part.get("error"),
-                }
-                yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+            txt, _p, _u = transform_prompt(prompt, req.target_model, task_type, req.depth, [], lang, False)
+            return (txt or "").strip()
         except Exception as e:
-            yield f"data: {json.dumps({'error': str(e), 'done': True})}\n\n"
+            return f"__ERR__{e}"
 
-    return StreamingResponse(gen(), media_type="text/event-stream")
+    results = map_ordered(_gen, list(range(BEST_OF)), max_workers=BEST_OF)
+    cands = [r for r in results if r and not r.startswith("__ERR__")]
+    if not cands:
+        err = next((r[7:] for r in results if r.startswith("__ERR__")), "generation failed")
+        return {"transformed": "", "error": err, "task_type": task_type}
+
+    best = cands[pick_best(prompt, cands, req.target_model) if len(cands) > 1 else 0]
+    metrics.incr("requests")
+    return {"transformed": best, "error": None, "task_type": task_type}

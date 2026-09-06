@@ -1,0 +1,15 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.git/
+.github/
+prompts.json
+.lancedb/
+lancedb_store/
+data/*.parquet
+vscode-extension/node_modules/
+vscode-extension/out/
+tests/
+bench/
+*.md

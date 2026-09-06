@@ -1,21 +1,44 @@
+# ── Python ──
 .venv/
+venv/
 __pycache__/
 *.pyc
-.env
-lancedb_store/
 *.egg-info/
-.DS_Store
+.pytest_cache/
 
-# VS Code Extension binaries
+# ── Secrets & env ──
+.env
+.env.*
+
+# ── RAG / build artifacts (rebuilt on demand, not shipped) ──
+prompts.json            # 6MB legacy corpus — kept locally, never pushed
+lancedb_store/
+.lancedb/
+*.parquet
+embedding_cache.pkl
+.corpus_cache.json
+bench/results/
+
+# ── VS Code extension binaries ──
 vscode-extension/out/
 vscode-extension/node_modules/
 vscode-extension/*.vsix
 vscode-extension/*.png
-# Generated at runtime (rebuilt from prompts.json on first start)
-embedding_cache.pkl
 
-# Desktop app scratch (sent-file copies)
-Claude outputs/
-.corpus_cache.json
-bench/results/
+# ── Editors / OS / scratch ──
+.DS_Store
+.idea/
+*.log
 *.bak
+*.tgz
+*.thumbnail
+Claude outputs/
+
+# stray binaries (HF rejects non-LFS binaries)
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.pkl
+*.zip
+*.ico

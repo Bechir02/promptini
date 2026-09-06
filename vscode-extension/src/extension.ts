@@ -94,7 +94,7 @@ function getWebviewHtml(url: string, mode: string): string {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Prompt Forge</title>
+    <title>Promptini</title>
     <style>
       body, html {
         margin: 0;
@@ -102,7 +102,7 @@ function getWebviewHtml(url: string, mode: string): string {
         width: 100%;
         height: 100%;
         overflow: hidden;
-        background: white;
+        background: #FAF9F6;
       }
       iframe {
         border: none;
@@ -115,7 +115,7 @@ function getWebviewHtml(url: string, mode: string): string {
         left: 0;
         right: 0;
         padding: 10px 16px;
-        background: #c4633e;
+        background: #92400E;
         color: white;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         font-size: 12px;
