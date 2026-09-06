@@ -84,88 +84,69 @@ function waitForServer(port: number, timeoutMs: number): Promise<void> {
 
 // ── Webview HTML with message bridge ─────────────────────────────────────────
 function getWebviewHtml(url: string, mode: string): string {
-  const banner = mode === "local" 
-    ? `<div class="banner">Local Server Running. Port: ${new URL(url).port}</div>`
-    : "";
-  const containerTop = mode === "local" ? "42px" : "0";
-
+  const base = url.replace(/\/+$/, "");
   return `<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Promptini</title>
-    <style>
-      body, html {
-        margin: 0;
-        padding: 0;
-        width: 100%;
-        height: 100%;
-        overflow: hidden;
-        background: #FAF9F6;
-      }
-      iframe {
-        border: none;
-        width: 100%;
-        height: 100%;
-      }
-      .banner {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        padding: 10px 16px;
-        background: #92400E;
-        color: white;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        font-size: 12px;
-        font-weight: 600;
-        z-index: 10;
-        text-align: center;
-      }
-      .iframe-container {
-        position: absolute;
-        top: ${containerTop};
-        left: 0;
-        right: 0;
-        bottom: 0;
-      }
-    </style>
-  </head>
-  <body>
-    ${banner}
-    <div class="iframe-container">
-      <iframe id="app-frame" src="${url}"></iframe>
-    </div>
-    <script>
-      const vscode = acquireVsCodeApi();
-
-      // Listen for messages FROM the Gradio iframe (via window.top.postMessage)
-      window.addEventListener('message', (event) => {
-        const data = event.data;
-        if (!data || !data.type) return;
-
-        // Forward to the VS Code extension host
-        if (data.type === 'copyText' || data.type === 'savePrompt' || data.type === 'ready') {
-          vscode.postMessage(data);
-        }
-      });
-
-      // Listen for messages FROM the VS Code extension host
-      window.addEventListener('message', (event) => {
-        const data = event.data;
-        if (!data || !data.type) return;
-
-        // Forward to the Gradio iframe
-        if (data.type === 'syncLibrary' || data.type === 'setPrompt') {
-          const iframe = document.getElementById('app-frame');
-          if (iframe && iframe.contentWindow) {
-            iframe.contentWindow.postMessage(data, '*');
-          }
-        }
-      });
-    </script>
-  </body>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'unsafe-inline'; connect-src ${base};" />
+<title>Promptini</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Naskh+Arabic:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;}
+  body{margin:0;padding:12px;background:#FAF9F6;color:#26221B;font-family:Inter,'Noto Naskh Arabic',system-ui,sans-serif;font-size:12px;}
+  .hd{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  .logo{width:22px;height:22px;border-radius:6px;background:#F3EDE3;border:1px solid #E3D9C9;color:#92400E;display:flex;align-items:center;justify-content:center;font-size:12px;}
+  .nm{font-size:13px;font-weight:700;letter-spacing:-.03em;} .nm span{color:#92400E;}
+  .ver{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:10px;color:#9A9284;}
+  textarea{width:100%;height:78px;resize:none;border:1px solid rgba(226,216,199,.9);border-radius:10px;background:#fff;color:#26221B;padding:8px;font-family:Inter,'Noto Naskh Arabic',sans-serif;font-size:12px;line-height:1.55;margin-bottom:8px;}
+  select{width:100%;appearance:none;border:1px solid rgba(226,216,199,.9);border-radius:10px;background:#fff;color:#26221B;padding:8px;font-size:12px;margin-bottom:8px;}
+  .btn{width:100%;border-radius:10px;font-size:12px;font-weight:600;padding:10px;cursor:pointer;font-family:inherit;}
+  .forge{background:#EFE9DF;border:1px solid #DED5C7;color:#2A2318;box-shadow:inset 0 1px 0 rgba(255,255,255,.7);}
+  .forge:hover{background:#E7DFD2;}
+  .lbl{display:flex;align-items:center;justify-content:space-between;margin:12px 0 6px;}
+  .k{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#9A9284;}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:600;color:#9A9284;}
+  .pill .dot{width:5px;height:5px;border-radius:50%;background:#C9CACE;}
+  .pill.ready{color:#3F6212;} .pill.ready .dot{background:#65A30D;box-shadow:0 0 6px #65A30D;}
+  .pill.eval{color:#92400E;} .pill.eval .dot{background:#B45309;}
+  pre{margin:0 0 8px;min-height:130px;max-height:340px;overflow:auto;border:1px solid rgba(226,216,199,.9);border-radius:10px;background:#FCFBF9;color:#3A342A;padding:10px;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.7;white-space:pre-wrap;}
+  .copy{background:#fff;border:1px solid rgba(226,216,199,.9);color:#26221B;}
+  .copy:hover{background:#FAF9F6;}
+</style>
+</head>
+<body>
+  <div class="hd"><div class="logo">&#9889;</div><div class="nm">Prompt<span>ini</span></div><div class="ver">cloud</div></div>
+  <textarea id="idea" dir="auto" placeholder="Rough idea…"></textarea>
+  <select id="model">
+    <option value="claude-code">Claude</option><option value="gpt-4">ChatGPT</option>
+    <option value="gemini">Gemini</option><option value="cursor">Cursor</option><option value="general">Any</option>
+  </select>
+  <button class="btn forge" id="forge">&#9889; Promptini</button>
+  <div class="lbl"><span class="k">Output</span><span class="pill" id="st"><span class="dot"></span>Idle</span></div>
+  <pre id="out">Your optimized prompt will appear here.</pre>
+  <button class="btn copy" id="copy">&#128203; Copy prompt</button>
+<script>
+  var API = "${base}";
+  var idea=document.getElementById('idea'), out=document.getElementById('out'),
+      forgeBtn=document.getElementById('forge'), copyBtn=document.getElementById('copy'),
+      model=document.getElementById('model'), st=document.getElementById('st');
+  function setSt(cls,label){ st.className='pill '+cls; st.innerHTML='<span class="dot"></span>'+label; }
+  forgeBtn.addEventListener('click', function(){
+    var p=(idea.value||'').trim(); if(!p) return;
+    forgeBtn.disabled=true; forgeBtn.textContent='Forging…'; setSt('eval','Evaluating'); out.textContent='';
+    fetch(API+'/forge',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({prompt:p,target_model:model.value,depth:'standard',language:'english'})})
+      .then(function(r){return r.json();})
+      .then(function(d){ if(d && d.transformed){ out.textContent=d.transformed; setSt('ready','Ready'); }
+        else { out.textContent='⚠ '+((d&&d.error)||'failed'); setSt('','Error'); } })
+      .catch(function(e){ out.textContent='⚠ '+e.message; setSt('','Error'); })
+      .then(function(){ forgeBtn.disabled=false; forgeBtn.innerHTML='&#9889; Promptini'; });
+  });
+  copyBtn.addEventListener('click', function(){ var t=out.textContent||''; if(t) navigator.clipboard.writeText(t); });
+</script>
+</body>
 </html>`;
 }
 
