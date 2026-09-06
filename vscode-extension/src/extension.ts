@@ -5,7 +5,7 @@ import * as fs from "fs";
 import * as vscode from "vscode";
 import { ChildProcess, spawn } from "child_process";
 
-let promptiniProcess: ChildProcess | undefined;
+let promptForgeProcess: ChildProcess | undefined;
 let currentPort: number | undefined;
 let currentPanel: vscode.WebviewPanel | undefined;
 
@@ -19,11 +19,11 @@ interface LibraryEntry {
 }
 
 function getLibrary(ctx: vscode.ExtensionContext): LibraryEntry[] {
-  return ctx.globalState.get<LibraryEntry[]>("promptiniLibrary", []);
+  return ctx.globalState.get<LibraryEntry[]>("promptForgeLibrary", []);
 }
 
 function saveLibrary(ctx: vscode.ExtensionContext, lib: LibraryEntry[]) {
-  ctx.globalState.update("promptiniLibrary", lib);
+  ctx.globalState.update("promptForgeLibrary", lib);
 }
 
 // ── Utility functions ────────────────────────────────────────────────────────
@@ -117,7 +117,7 @@ function getWebviewHtml(url: string, mode: string): string {
 </style>
 </head>
 <body>
-  <div class="hd"><div class="logo">&#9889;</div><div class="nm">Prompt<span>ini</span></div><div class="ver">v1.0</div></div>
+  <div class="hd"><div class="logo">&#9889;</div><div class="nm">Prompt<span>ini</span></div><div class="ver">cloud</div></div>
   <textarea id="idea" dir="auto" placeholder="Rough idea…"></textarea>
   <select id="model">
     <option value="claude-code">Claude</option><option value="gpt-4">ChatGPT</option>
@@ -135,7 +135,7 @@ function getWebviewHtml(url: string, mode: string): string {
   function setSt(cls,label){ st.className='pill '+cls; st.innerHTML='<span class="dot"></span>'+label; }
   forgeBtn.addEventListener('click', function(){
     var p=(idea.value||'').trim(); if(!p) return;
-    forgeBtn.disabled=true; forgeBtn.textContent='Optimizing…'; setSt('eval','Evaluating'); out.textContent='';
+    forgeBtn.disabled=true; forgeBtn.textContent='Forging…'; setSt('eval','Evaluating'); out.textContent='';
     fetch(API+'/forge',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({prompt:p,target_model:model.value,depth:'standard',language:'english'})})
       .then(function(r){return r.json();})
@@ -153,7 +153,7 @@ function getWebviewHtml(url: string, mode: string): string {
 // ── Python launcher ──────────────────────────────────────────────────────────
 function choosePythonCommand(cwd?: string): string {
     // 1. Explicit override from settings.
-    const configured = vscode.workspace.getConfiguration("promptini").get<string>("pythonPath");
+    const configured = vscode.workspace.getConfiguration("promptForge").get<string>("pythonPath");
     if (configured && fs.existsSync(configured)) {
         return configured;
     }
@@ -172,10 +172,12 @@ function choosePythonCommand(cwd?: string): string {
     return process.platform === "win32" ? "python" : "python3";
 }
 
-function launchPromptini(cwd: string, port: number, output: vscode.OutputChannel): ChildProcess {
+function launchPromptForge(appPath: string, cwd: string, port: number, output: vscode.OutputChannel): ChildProcess {
   const python = choosePythonCommand(cwd);
-  const childProcess = spawn(python, ["-m", "uvicorn", "api:app", "--host", "127.0.0.1", "--port", String(port)], {
+  const env = { ...process.env, GRADIO_SERVER_PORT: port.toString() };
+  const childProcess = spawn(python, [appPath], {
     cwd,
+    env,
     shell: false,
   });
 
@@ -188,18 +190,18 @@ function launchPromptini(cwd: string, port: number, output: vscode.OutputChannel
   });
 
   childProcess.on("exit", (code: number | null, signal: NodeJS.Signals | null) => {
-    output.appendLine(`Promptini process exited with code=${code} signal=${signal}`);
-    promptiniProcess = undefined;
+    output.appendLine(`Prompt Forge process exited with code=${code} signal=${signal}`);
+    promptForgeProcess = undefined;
   });
 
   return childProcess;
 }
 
-function stopPromptini(output: vscode.OutputChannel) {
-  if (promptiniProcess && !promptiniProcess.killed) {
-    output.appendLine("Stopping Promptini...");
-    promptiniProcess.kill();
-    promptiniProcess = undefined;
+function stopPromptForge(output: vscode.OutputChannel) {
+  if (promptForgeProcess && !promptForgeProcess.killed) {
+    output.appendLine("Stopping Prompt Forge...");
+    promptForgeProcess.kill();
+    promptForgeProcess = undefined;
     currentPort = undefined;
   }
   if (currentPanel) {
@@ -251,8 +253,8 @@ function setupMessageHandler(
 }
 
 // ── Sidebar WebviewViewProvider ──────────────────────────────────────────────
-class PromptiniSidebarProvider implements vscode.WebviewViewProvider {
-  public static readonly viewType = "promptiniView";
+class PromptForgeSidebarProvider implements vscode.WebviewViewProvider {
+  public static readonly viewType = "promptForgeView";
   private _view?: vscode.WebviewView;
 
   constructor(private readonly _context: vscode.ExtensionContext) {}
@@ -264,7 +266,7 @@ class PromptiniSidebarProvider implements vscode.WebviewViewProvider {
       enableScripts: true,
     };
 
-    const config = vscode.workspace.getConfiguration("promptini");
+    const config = vscode.workspace.getConfiguration("promptForge");
     const hfUrl = config.get<string>("hfUrl") || "https://becher-zribi-prompt-forge-rag.hf.space";
     
     webviewView.webview.html = getWebviewHtml(hfUrl, "cloud");
@@ -280,24 +282,24 @@ class PromptiniSidebarProvider implements vscode.WebviewViewProvider {
 
 // ── Activation ──────────────────────────────────────────────────────────────
 export function activate(context: vscode.ExtensionContext) {
-  const output = vscode.window.createOutputChannel("Promptini Server");
+  const output = vscode.window.createOutputChannel("Prompt Forge Server");
 
   // Register sidebar provider
-  const sidebarProvider = new PromptiniSidebarProvider(context);
+  const sidebarProvider = new PromptForgeSidebarProvider(context);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
-      PromptiniSidebarProvider.viewType,
+      PromptForgeSidebarProvider.viewType,
       sidebarProvider,
       { webviewOptions: { retainContextWhenHidden: true } }
     )
   );
 
   // "Open App" command — opens in a full editor panel
-  const openCommand = vscode.commands.registerCommand("promptini.open", async () => {
+  const openCommand = vscode.commands.registerCommand("promptForge.open", async () => {
     if (currentPanel) {
       currentPanel.reveal(vscode.ViewColumn.One);
     } else {
-      currentPanel = vscode.window.createWebviewPanel("promptini", "Promptini", vscode.ViewColumn.One, {
+      currentPanel = vscode.window.createWebviewPanel("promptForge", "Prompt Forge", vscode.ViewColumn.One, {
         enableScripts: true,
         retainContextWhenHidden: true,
       });
@@ -307,7 +309,7 @@ export function activate(context: vscode.ExtensionContext) {
       });
     }
 
-    const config = vscode.workspace.getConfiguration("promptini");
+    const config = vscode.workspace.getConfiguration("promptForge");
     const mode = config.get<string>("mode") || "cloud";
     const hfUrl = config.get<string>("hfUrl") || "https://becher-zribi-prompt-forge-rag.hf.space";
 
@@ -318,24 +320,24 @@ export function activate(context: vscode.ExtensionContext) {
     } else {
       const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
       if (!workspaceFolder) {
-        vscode.window.showErrorMessage("Open a workspace folder before launching Promptini.");
+        vscode.window.showErrorMessage("Open a workspace folder before launching Prompt Forge.");
         return;
       }
 
       const workspaceRoot = workspaceFolder.uri.fsPath;
-      const appPath = path.join(workspaceRoot, "api.py");
+      const appPath = path.join(workspaceRoot, "app.py");
 
       if (!(await canFileExist(appPath))) {
-        vscode.window.showErrorMessage("Could not find api.py in the workspace root.");
+        vscode.window.showErrorMessage("Could not find app.py in the workspace root.");
         return;
       }
 
-      if (promptiniProcess && !promptiniProcess.killed) {
-        stopPromptini(output);
+      if (promptForgeProcess && !promptForgeProcess.killed) {
+        stopPromptForge(output);
       }
 
       output.show(true);
-      output.appendLine("Starting Promptini Python server...");
+      output.appendLine("Starting Prompt Forge Python server...");
 
       let port = 7860;
       try {
@@ -346,60 +348,60 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       }
 
-      promptiniProcess = launchPromptini(workspaceRoot, port, output);
+      promptForgeProcess = launchPromptForge(appPath, workspaceRoot, port, output);
 
       try {
         await waitForServer(port, 120000);
       } catch (err) {
-        vscode.window.showErrorMessage(`Promptini did not start in time: ${err instanceof Error ? err.message : err}`);
+        vscode.window.showErrorMessage(`Prompt Forge did not start in time: ${err instanceof Error ? err.message : err}`);
         return;
       }
 
       currentPort = port;
       currentPanel.webview.html = getWebviewHtml(`http://127.0.0.1:${port}/`, "local");
       setupMessageHandler(currentPanel.webview, context);
-      vscode.window.showInformationMessage(`Promptini is ready on port ${port}`);
+      vscode.window.showInformationMessage(`Prompt Forge is ready on port ${port}`);
     }
   });
 
-  // "Optimize Selection" command — sends selected text to the sidebar
-  const forgeSelectionCmd = vscode.commands.registerCommand("promptini.optimizeSelection", () => {
+  // "Forge Selection" command — sends selected text to the sidebar
+  const forgeSelectionCmd = vscode.commands.registerCommand("promptForge.forgeSelection", () => {
     const editor = vscode.window.activeTextEditor;
     if (!editor) return;
     const selection = editor.document.getText(editor.selection);
     if (selection) {
       sidebarProvider.sendPrompt(selection);
-      vscode.window.showInformationMessage("Text sent to Promptini sidebar.");
+      vscode.window.showInformationMessage("Text sent to Prompt Forge sidebar.");
     }
   });
 
-  const stopCommand = vscode.commands.registerCommand("promptini.stop", async () => {
-    stopPromptini(output);
-    output.appendLine("Promptini stopped.");
-    vscode.window.showInformationMessage("Promptini has been stopped.");
+  const stopCommand = vscode.commands.registerCommand("promptForge.stop", async () => {
+    stopPromptForge(output);
+    output.appendLine("Prompt Forge stopped.");
+    vscode.window.showInformationMessage("Prompt Forge has been stopped.");
   });
 
-  // "Optimize Selection via API" — calls the local FastAPI engine (api.py)
-  const forgeApiCmd = vscode.commands.registerCommand("promptini.optimizeSelectionApi", async () => {
+  // "Forge Selection via API" — calls the local FastAPI engine (api.py)
+  const forgeApiCmd = vscode.commands.registerCommand("promptForge.forgeSelectionApi", async () => {
     const editor = vscode.window.activeTextEditor;
     if (!editor) { return; }
     const selection = editor.document.getText(editor.selection);
     if (!selection) {
-      vscode.window.showWarningMessage("Select some text to optimize first.");
+      vscode.window.showWarningMessage("Select some text to forge first.");
       return;
     }
-    const cfg = vscode.workspace.getConfiguration("promptini");
+    const cfg = vscode.workspace.getConfiguration("promptForge");
     const base = (cfg.get<string>("apiUrl") || "http://127.0.0.1:8000").replace(/\/$/, "");
     const targetModel = cfg.get<string>("apiModel") || "general";
     const fetchFn: any = (globalThis as any).fetch;
     try {
       const result = await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: "Promptini: optimizing via API…" },
+        { location: vscode.ProgressLocation.Notification, title: "Prompt Forge: forging via API…" },
         async () => {
           const r = await fetchFn(`${base}/forge`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt: selection, target_model: targetModel, depth: "standard", language: "english" }),
+            body: JSON.stringify({ prompt: selection, target_model: targetModel, score: false }),
           });
           if (!r.ok) { throw new Error(`HTTP ${r.status}`); }
           return await r.json();
@@ -407,14 +409,14 @@ export function activate(context: vscode.ExtensionContext) {
       );
       const transformed = result && result.transformed;
       if (!transformed) {
-        vscode.window.showErrorMessage("Promptini API returned no prompt.");
+        vscode.window.showErrorMessage("Prompt Forge API returned no prompt.");
         return;
       }
       await editor.edit((ed) => ed.replace(editor.selection, transformed));
-      vscode.window.showInformationMessage("✨ Prompt optimized via API.");
+      vscode.window.showInformationMessage("✨ Prompt forged via API.");
     } catch (err: any) {
       vscode.window.showErrorMessage(
-        `Promptini API error: ${err?.message ?? err}. Is the engine running (uvicorn api:app)?`
+        `Prompt Forge API error: ${err?.message ?? err}. Is the engine running (uvicorn api:app)?`
       );
     }
   });
@@ -423,8 +425,8 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {
-  if (promptiniProcess && !promptiniProcess.killed) {
-    promptiniProcess.kill();
-    promptiniProcess = undefined;
+  if (promptForgeProcess && !promptForgeProcess.killed) {
+    promptForgeProcess.kill();
+    promptForgeProcess = undefined;
   }
 }

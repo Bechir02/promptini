@@ -61,12 +61,12 @@ Then inside VS Code:
 
 In the Extension Development Host:
 - Press `Cmd+Shift+P` (or `Ctrl+Shift+P` on Windows/Linux)
-- Type `Promptini: Open App`
+- Type `Prompt Forge: Open App`
 - The server will start, and the UI opens in the Webview
 
 To stop:
 - Press `Cmd+Shift+P`
-- Type `Promptini: Stop App`
+- Type `Prompt Forge: Stop App`
 
 ---
 
@@ -103,7 +103,7 @@ You can distribute `prompt-forge-vscode-0.1.0.vsix` to teammates. They can insta
 If port 7860 is already in use (by another Gradio app or service), the extension automatically tries ports 7861, 7862, etc. The banner shows which port is being used.
 
 ### Explicit Stop Command
-- `Promptini: Stop App` kills the Python process and closes the Webview
+- `Prompt Forge: Stop App` kills the Python process and closes the Webview
 - Useful if you want to restart the app or free up resources
 
 ### Environment Variable Injection
@@ -118,7 +118,7 @@ The extension passes `GRADIO_SERVER_PORT` to the Python process, ensuring Gradio
 - Verify `app.py` exists in the workspace root
 
 ### "Server did not become available"
-- Check the "Promptini Server" output channel for Python errors
+- Check the "Prompt Forge Server" output channel for Python errors
 - Verify all Python dependencies are installed: `pip install -r requirements.txt`
 - Check if port 7860+ are available: `lsof -i :7860` (macOS/Linux)
 

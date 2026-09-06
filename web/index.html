@@ -122,7 +122,7 @@
         <div class="termbar"><span class="d"></span><span class="d"></span><span class="d"></span></div>
         <pre id="outputPre" class="empty">Your optimized prompt will appear here.</pre>
         <div id="skeleton">
-          <div class="title">Optimizing &amp; Evaluating…</div>
+          <div class="title">Forging &amp; Evaluating…</div>
           <div style="display:flex;flex-direction:column;gap:8px;">
             <div class="sk" style="width:38%"></div><div class="sk" style="width:92%"></div>
             <div class="sk" style="width:80%"></div><div class="sk" style="width:28%"></div><div class="sk" style="width:70%"></div>
@@ -166,7 +166,7 @@ function stopSteps(){ clearInterval(stepTimer); steps.forEach(s=>s.className="st
 async function forge(){
   const prompt = idea.value.trim();
   if(!prompt){ toast("Type a rough idea first"); return; }
-  forgeBtn.disabled=true; forgeBtn.innerHTML='Optimizing…<span class="sweep"></span>';
+  forgeBtn.disabled=true; forgeBtn.innerHTML='Forging…<span class="sweep"></span>';
   outputPre.style.display="none"; skeleton.style.display="flex"; runSteps();
   setStatus("eval","Evaluating"); tok.textContent="evaluating…";
   try{

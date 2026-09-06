@@ -4,8 +4,4 @@
 **/.vscode
 **/*.ts
 .vscodeignore
-tsconfig.json
-package-lock.json
-SETUP.md
-REQUIREMENTS.md
-*.vsix
+README.md
