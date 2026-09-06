@@ -1,56 +1,27 @@
-# Prompt Forge VS Code Extension
+# ⚡ Promptini — Derja Prompt Studio
 
-This extension launches the local Prompt Forge Gradio app and opens it inside a VS Code Webview.
+Turn a rough idea — in **Tunisian Derja, Arabizi, Arabic, French, or English** — into a clean, **model-ready prompt**, right inside VS Code.
+
+Promptini understands messy, code-switched developer input (the way people in Tunisia actually type) and rewrites it into a precise, structured, model-optimized prompt you can paste straight into Claude, ChatGPT, Gemini, Cursor, or Copilot.
 
 ## Features
 
-- 🚀 **Dynamic Port Selection** — Automatically finds an available port if 7860 is in use
-- ⏹️ **Explicit Stop Command** — Stop the server with a single command
-- 📦 **.vsix Packaging** — Build a distributable extension package
-
-## Setup
-
-```bash
-cd vscode-extension
-npm install
-npm run compile
-```
+- **Derja-first** — understands authentic Tunisian Derja and Arabizi (`3→ع`, `7→ح`, `9→ق`).
+- **Model-aware** — formats the prompt for your target tool (Claude, ChatGPT, Gemini, Cursor, or Any).
+- **Always-English output** — the messy input can be any language; the optimized prompt comes out clean and English.
+- **One-click sidebar panel** — type a rough idea, hit **⚡ Promptini**, and copy the result.
+- **Forge Selection** — turn highlighted editor text into an optimized prompt via the engine API.
 
 ## Usage
 
-### From VS Code
+1. Click the **⚡ Promptini** icon in the Activity Bar.
+2. Type or paste a rough idea, pick a model, and hit **⚡ Promptini**.
+3. **Copy prompt** and paste it into your AI tool.
 
-1. Open the repository in VS Code
-2. Press `F5` to start the Extension Development Host
-3. Run the command `Prompt Forge: Open App`
-4. Optionally, run `Prompt Forge: Stop App` to stop the server
+## Configuration
 
-### From Command Palette
+- `promptForge.hfUrl` — the Promptini engine URL (defaults to the hosted cloud app).
+- `promptForge.mode` — `cloud` (hosted engine) or `local` (your own server).
+- `promptForge.apiUrl` / `promptForge.apiModel` — endpoint + target model for **Forge Selection**.
 
-- `Prompt Forge: Open App` — Start the server and open in webview
-- `Prompt Forge: Stop App` — Stop the running server
-
-### Build a Distributable .vsix
-
-```bash
-cd vscode-extension
-npm install
-npm run compile
-npm run package
-```
-
-This generates `prompt-forge-vscode-0.1.0.vsix` which can be installed directly into VS Code or shared.
-
-## Requirements
-
-- A Python interpreter available as `python3` on macOS/Linux or `python` on Windows
-- `app.py` in the workspace root
-- `npm` installed for compiling the extension
-
-## How It Works
-
-1. Extension detects the first available port starting from 7860
-2. Launches `app.py` with `GRADIO_SERVER_PORT` environment variable
-3. Waits for the server to become available
-4. Opens the app inside a VS Code Webview panel
-5. Manages the Python process lifecycle
+Built on a 100% free / open-source stack (Groq inference, Hugging Face hosting).
