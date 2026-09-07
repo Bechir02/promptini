@@ -1,4 +1,16 @@
-# ⚡ Promptini
+<!--
+---
+title: Promptini
+emoji: ⚡
+colorFrom: yellow
+colorTo: gray
+sdk: docker
+app_port: 7860
+pinned: false
+---
+-->
+
+<div align="center">
 
 **Turn a rough idea in Tunisian Derja, Arabic, French, or English into a clean, model-ready prompt, without leaving VS Code.**
 
