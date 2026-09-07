@@ -14,7 +14,7 @@ pinned: false
 
 # ⚡ Promptini
 
-**Turn a rough idea — in Tunisian Derja, Arabizi, Arabic, French, or English — into a clean, model-ready prompt.**
+**Turn a rough idea — in Tunisian Derja, Arabic, French, or English into a clean, model-ready prompt.**
 
 Promptini understands messy, code-switched developer input (the way people in Tunisia actually type) and rewrites it into a precise, structured, model-optimized prompt you can paste straight into Claude, ChatGPT, Gemini, Cursor, or Copilot.
 
@@ -44,7 +44,7 @@ Implement a GET /users endpoint that returns paginated user records.
 ...
 ```
 
-The **output is always English** (best for the target models) — the Derja/Arabizi is only used to *understand* what you want.
+The **output is always English** (best for the target models), the Derja is only used to *understand* what you want.
 
 ## Key features
 
