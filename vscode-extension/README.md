@@ -1,6 +1,6 @@
 # ⚡ Promptini
 
-**Turn a rough idea — in Tunisian Derja, Arabizi, Arabic, French, or English — into a clean, model-ready prompt, without leaving VS Code.**
+**Turn a rough idea in Tunisian Derja, Arabic, French, or English into a clean, model-ready prompt, without leaving VS Code.**
 
 Promptini reads messy, code-switched developer input and rewrites it into a precise, structured prompt you can paste straight into Claude, ChatGPT, Gemini, or Cursor. Whatever language you type in, the optimized prompt always comes out in clear English.
 
